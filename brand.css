@@ -1,0 +1,15 @@
+/* Exact approved N artwork, optically centered inside the existing 35 px menu button. */
+.hamburger .brand-mark {
+  display:block;
+  width:18px;
+  height:18px;
+  max-width:18px;
+  max-height:18px;
+  object-fit:contain;
+  justify-self:center;
+  align-self:center;
+  transform:translate(.2px,-.2px);
+  pointer-events:none;
+  user-select:none;
+  -webkit-user-drag:none;
+}

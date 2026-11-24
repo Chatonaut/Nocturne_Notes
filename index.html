@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' data:; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'">
+<title>Nocturne Notes</title>
+<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="brand.css">
+</head>
+<body>
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
+ <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+ <symbol id="i-chevron-left" viewBox="0 0 24 24"><path d="m14.5 5-7 7 7 7"/></symbol>
+ <symbol id="i-chevron-right" viewBox="0 0 24 24"><path d="m9.5 5 7 7-7 7"/></symbol>
+ <symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="m5 9 7 7 7-7"/></symbol>
+ <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 4v16M4 12h16"/></symbol>
+ <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.8" cy="10.8" r="6.5"/><path d="m16 16 5 5"/></symbol>
+ <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+ <symbol id="i-maximize" viewBox="0 0 24 24"><rect width="14" height="14" x="5" y="5" rx="1.5"/></symbol>
+ <symbol id="i-x" viewBox="0 0 24 24"><path d="M5 5l14 14M19 5 5 19"/></symbol>
+ <symbol id="i-file-plus" viewBox="0 0 24 24"><path d="M13 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h8m-1-18 6 6h-6V3Zm5 12v7m-3.5-3.5h7"/></symbol>
+ <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/></symbol>
+ <symbol id="i-save" viewBox="0 0 24 24"><path d="M5 3h12l4 4v14H3V3h2Zm2 0v6h10V3M7 21v-8h10v8"/></symbol>
+ <symbol id="i-export" viewBox="0 0 24 24"><path d="M12 3v12m-4-4 4 4 4-4M4 17v4h16v-4"/></symbol>
+ <symbol id="i-settings" viewBox="0 0 24 24"><path d="M10 2h4l.55 2.37c.45.15.88.33 1.29.54L18 3.62 20.38 6l-1.29 2.16c.21.41.39.84.54 1.29L22 10v4l-2.37.55c-.15.45-.33.88-.54 1.29L20.38 18 18 20.38l-2.16-1.29c-.41.21-.84.39-1.29.54L14 22h-4l-.55-2.37c-.45-.15-.88-.33-1.29-.54L6 20.38 3.62 18l1.29-2.16c-.21-.41-.39-.84-.54-1.29L2 14v-4l2.37-.55c.15-.45.33-.88.54-1.29L3.62 6 6 3.62l2.16 1.29c.41-.21.84-.39 1.29-.54L10 2Z"/><circle cx="12" cy="12" r="3"/></symbol>
+ <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10v.5"/></symbol>
+ <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M7 7l1 14h8l1-14M10 11v6m4-6v6"/></symbol>
+ <symbol id="i-rename" viewBox="0 0 24 24"><path d="m4 20 4.2-1 11-11a2.2 2.2 0 0 0-3.2-3.2l-11 11L4 20Zm9-12 3 3"/></symbol>
+ <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a5 5 0 0 0 7.1 0l3-3A5 5 0 0 0 13 3.9l-2 2M14 10a5 5 0 0 0-7.1 0l-3 3A5 5 0 0 0 11 20.1l2-2"/></symbol>
+ <symbol id="i-bullets" viewBox="0 0 24 24"><path d="M9 6h12M9 12h12M9 18h12"/><circle cx="4" cy="6" r="1" fill="currentColor" stroke="none"/><circle cx="4" cy="12" r="1" fill="currentColor" stroke="none"/><circle cx="4" cy="18" r="1" fill="currentColor" stroke="none"/></symbol>
+ <symbol id="i-numbered" viewBox="0 0 24 24"><path d="M11 6h10M11 12h10M11 18h10M3.5 4.5h1V9m-1.5 7.5q0-2 2-2t1 2l-2 2H6"/></symbol>
+ <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.6" fill="currentColor" stroke="none"/></symbol>
+</svg>
+<div class="desktop" id="desktop">
+ <div class="window" id="window">
+  <header class="titlebar" id="titlebar">
+   <svg class="glass-wave" aria-hidden="true" viewBox="0 0 1240 50" preserveAspectRatio="none">
+    <defs><linearGradient id="waveLight"><stop offset="0%" stop-color="#ffffff" stop-opacity="0"/><stop offset="35%" stop-color="#ffffff" stop-opacity=".035"/><stop offset="63%" stop-color="#ffffff" stop-opacity=".31"/><stop offset="82%" stop-color="#ffffff" stop-opacity=".65"/><stop offset="100%" stop-color="#ffffff" stop-opacity="0"/></linearGradient></defs>
+    <path d="M100 1 C240 0 220 44 370 32 S560 -4 680 10 S860 73 1000 7 S1160 5 1240 0" fill="none" stroke="url(#waveLight)" stroke-width="1.25"/>
+   </svg>
+   <button class="hamburger glass-round no-drag" id="menu-toggle" aria-label="Меню приложения" aria-haspopup="true" aria-expanded="false" title="Меню"><img class="brand-mark" src="assets/nocturne-brand-mark.png" alt="" aria-hidden="true"></button>
+   <span class="app-title"><span class="app-name">Nocturne Notes</span><span class="project-caption" id="project-caption" title="Текущий проект">— Без названия</span></span>
+   <div class="drag-space"></div>
+   <div class="window-controls no-drag" aria-label="Управление окном">
+    <button id="min-btn" title="Свернуть"><svg viewBox="0 0 24 24"><use href="#i-minus"/></svg></button>
+    <button id="max-btn" title="Развернуть"><svg viewBox="0 0 24 24"><use href="#i-maximize"/></svg></button>
+    <button id="close-btn" title="Закрыть"><svg viewBox="0 0 24 24"><use href="#i-x"/></svg></button>
+   </div>
+  </header>
+  <div class="workarea" id="workarea">
+   <aside class="sidebar" id="sidebar" aria-label="Заметки проекта">
+    <section class="sidebar-search" id="sidebar-search" aria-label="Поиск и замена" hidden>
+     <div class="search-heading"><span>Поиск и замена</span><button id="search-close" title="Закрыть поиск" aria-label="Закрыть поиск" type="button"><svg><use href="#i-x"/></svg></button></div>
+     <input id="search-query" maxlength="250" type="search" autocomplete="off" spellcheck="false" placeholder="Поиск..." aria-label="Поиск">
+     <div class="search-navigation" id="search-navigation" hidden aria-label="Результаты поиска">
+      <span id="search-counter" class="search-counter" aria-live="polite">0 из 0</span>
+      <div class="search-navigation-buttons"><button id="search-previous" type="button" aria-label="Предыдущее совпадение" title="Предыдущее · Shift+Enter"><svg viewBox="0 0 24 24"><path d="m6 15 6-6 6 6"/></svg></button><button id="search-next" type="button" aria-label="Следующее совпадение" title="Следующее · Enter"><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></button></div>
+     </div>
+     <input id="search-replacement" maxlength="1000" type="text" autocomplete="off" spellcheck="false" placeholder="Заменить..." aria-label="Заменить">
+     <div class="search-scope" role="group" aria-label="Область поиска">
+      <button type="button" data-search-scope="note" aria-pressed="true" class="selected">Заметка</button>
+      <button type="button" data-search-scope="project" aria-pressed="false">Весь проект</button>
+     </div>
+     <div class="search-actions"><button id="search-replace-one" type="button">Заменить</button><button id="search-replace-all" type="button">Заменить все</button></div>
+    </section>
+   <div class="note-list" id="note-list" role="listbox" aria-label="Список заметок"></div>
+    <div class="sidebar-footer"><button class="add-note glass-round" id="add-note" aria-label="Новая заметка" title="Новая заметка · Ctrl+N"><svg><use href="#i-plus"/></svg></button><button class="search-note glass-round" id="search-toggle" aria-label="Поиск и замена" aria-expanded="false" title="Поиск и замена · Ctrl+F"><svg><use href="#i-search"/></svg></button><button class="save-note glass-round" id="save-shortcut" aria-label="Сохранить проект" title="Сохранить проект · Ctrl+S"><svg><use href="#i-save"/></svg></button></div>
+    <div class="sidebar-resizer" id="sidebar-resizer" role="separator" aria-label="Изменить ширину боковой панели" aria-orientation="vertical" tabindex="0" title="Потяните, чтобы изменить ширину"></div>
+    <button class="sidebar-tab" id="sidebar-tab" aria-label="Скрыть список заметок" title="Показать или скрыть список заметок · Ctrl+\\"><svg><use href="#i-chevron-left"/></svg></button>
+   </aside>
+   <main class="editor-outer" id="editor-outer">
+    <div class="editor-surface" id="editor-surface">
+     <div class="editor-scroll" id="editor-scroll">
+      <input class="note-title" id="note-title" type="text" autocomplete="off" spellcheck="false" placeholder="Без названия" aria-label="Название заметки" maxlength="250">
+      <div class="editor" id="editor" contenteditable="true" spellcheck="false" role="textbox" aria-multiline="true" data-placeholder="Начни писать..." aria-label="Текст заметки"></div>
+     </div>
+    </div>
+   </main>
+  </div>
+  <div class="floating-toolbar" id="floating-toolbar" role="toolbar" aria-label="Форматирование выделенного текста" hidden>
+   <button data-format="bold" class="format-letter format-bold" title="Жирный · Ctrl+B"><strong>B</strong></button>
+   <button data-format="italic" class="format-letter" title="Курсив · Ctrl+I"><em>I</em></button>
+   <button data-format="underline" class="format-letter" title="Подчеркивание · Ctrl+U"><u>U</u></button>
+   <button data-format="strikeThrough" class="format-letter" title="Зачеркивание"><s>S</s></button>
+   <i class="tool-divider"></i>
+   <button data-format="heading" class="heading-picker" id="heading-toggle" aria-label="Стиль текста" aria-haspopup="true" aria-expanded="false" title="Выбрать стиль текста"><span id="heading-label">Aa</span><svg class="small-arrow"><use href="#i-chevron-down"/></svg></button>
+   <i class="tool-divider"></i>
+   <button data-format="insertUnorderedList" title="Маркированный список"><svg><use href="#i-bullets"/></svg></button>
+   <button data-format="insertOrderedList" title="Нумерованный список"><svg><use href="#i-numbered"/></svg></button>
+   <button data-format="link" title="Добавить ссылку"><svg><use href="#i-link"/></svg></button>
+   <i class="tool-divider"></i>
+   <button data-format="color" id="color-button" class="color-button" title="Цвет текста"><span class="color-ring"></span><svg class="small-arrow"><use href="#i-chevron-down"/></svg></button>
+  </div>
+  <div class="heading-popover glass-popover" id="heading-popover" hidden aria-label="Выбор размера заголовка"></div>
+  <div class="color-popover glass-popover" id="color-popover" hidden aria-label="Палитра цветов текста">
+   <div class="popover-caption">Цвет текста</div><div class="color-grid" id="color-grid"></div>
+  </div>
+  <div class="glass-menu" id="app-menu" role="menu" hidden>
+   <button data-action="new-project" role="menuitem"><svg><use href="#i-file-plus"/></svg><span>Новый проект</span></button>
+   <button data-action="open-project" role="menuitem"><svg><use href="#i-folder"/></svg><span>Открыть проект...</span></button>
+   <button data-action="recent" role="menuitem"><svg><use href="#i-folder"/></svg><span>Недавние проекты</span><svg class="chevron"><use href="#i-chevron-right"/></svg></button>
+   <div class="menu-divider"></div>
+   <button data-action="save" role="menuitem"><svg><use href="#i-save"/></svg><span>Сохранить проект</span></button>
+   <button data-action="save-as" role="menuitem"><svg><use href="#i-save"/></svg><span>Сохранить как...</span></button>
+   <button data-action="export" role="menuitem"><svg><use href="#i-export"/></svg><span>Экспорт заметки</span><svg class="chevron"><use href="#i-chevron-right"/></svg></button>
+   <div class="menu-divider"></div>
+   <button data-action="settings" role="menuitem"><svg><use href="#i-settings"/></svg><span>Настройки</span></button>
+   <button data-action="about" role="menuitem"><svg><use href="#i-info"/></svg><span>О программе</span></button>
+  </div>
+  <div class="glass-menu submenu" id="submenu" hidden></div>
+  <div class="glass-menu context-menu" id="note-menu" hidden>
+   <button data-note-action="rename"><svg><use href="#i-rename"/></svg><span>Переименовать</span><kbd>F2</kbd></button>
+   <button data-note-action="move-up"><svg><use href="#i-chevron-left"/></svg><span>Выше</span></button>
+   <button data-note-action="move-down"><svg><use href="#i-chevron-right"/></svg><span>Ниже</span></button>
+   <div class="menu-divider"></div>
+   <button class="danger" data-note-action="delete"><svg><use href="#i-trash"/></svg><span>Удалить заметку</span></button>
+  </div>
+  <div class="dialog-backdrop" id="dialog-backdrop" hidden>
+   <div class="glass-dialog" role="dialog" aria-modal="true" aria-labelledby="dialog-heading">
+    <h2 id="dialog-heading"></h2><div id="dialog-message" class="dialog-message"></div>
+    <input id="dialog-input" class="dialog-input" hidden>
+    <div id="dialog-options" class="dialog-options" hidden></div>
+    <div class="dialog-buttons"><button id="dialog-cancel">Отмена</button><button class="dialog-primary" id="dialog-confirm">Готово</button></div>
+   </div>
+  </div>
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+ </div>
+</div>
+<input type="file" accept=".json,application/json" id="browser-import" hidden>
+<script src="settings.js"></script>
+<script src="i18n.js"></script>
+<script src="preview-api.js"></script>
+<script src="search.js"></script>
+<script src="renderer.js"></script>
+</body>
+</html>

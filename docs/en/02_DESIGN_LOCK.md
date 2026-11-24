@@ -1,0 +1,13 @@
+# Design lock — approved 2.0.0
+
+The authoritative implementation is index.html, styles.css, brand.css, windows-shell.css, features.css, renderer.js and the original artwork in assets/. The historical frozen HTML reference is reference/Nocturne-Notes-Approved-Preview-1.5.html. Run npm run verify:visual. Its HTML exceptions are only the approved settings and i18n scripts; never normalize or refactor frozen styles for convenience.
+
+- Near-black matte editor, compact glass chrome, subtle shadows and separators, rounded transparent Windows corners. Preserve all eight resize zones; minimum window 740×480 CSS px; native clipping/fallback logic remains intact. No extra panels, color themes, framework migration or redesign.
+- Top chrome: approved N mark, project caption clipped rather than ellipsized with full tooltip, fixed Undo/Redo group (70×34, x326 in reference geometry), focus and always-on-top controls, minimize/maximize/close. Close hover alone is red; no decorative wave.
+- Sidebar: draggable width from 120 px to dynamic maximum preserving editor area (440 px target); collapse entirely. Note titles are one line with clip, not ellipsis; active-note-only 6 px status dot. Footer three identical 36×36 buttons, centered with integer-position layout. Plus and disk use centered SVGs, search has its approved individual −0.46 px compensation. Do not dim the disk.
+- Editor: 35 px lateral text inset and target bottom visible-text clearance; align note title with first sidebar row; contextual compact formatting bar and 35-color palette. Preserve real selection state, no persistent active Bold.
+- Settings: 600 px dialog (bounded by window), horizontal sliders with 35 px step buttons, seven system fonts. Sections Editor, Saving, Application; language and tray in final section, equal section dividers and spacing. Restore original top Editor position; no special 12 px margin. At small sizes allow vertical scrolling; dropdown options must remain reachable. Action buttons retain approved dimensions. Trash dialog widths 440/400 px as appropriate.
+- Menus and dialogs: compact dark glass, controlled selection lists, 2 px hover separation where established, no extra wording. Native text and tray menus use Electron Menu. About: approved mark, product and version.
+- Artwork: original source unchanged. Standard generated ICO visible fill measured 92.48%; separate Start Menu shortcut ICO 97.46%; desktop, app, taskbar, installer, uninstaller and footer icons unchanged.
+
+Any future visual changes require explicit approval and real Windows screenshots at comparable sizes and DPI. Do not claim universal pixel accuracy from a browser preview.

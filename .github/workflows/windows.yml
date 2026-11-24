@@ -1,0 +1,100 @@
+name: Windows release
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout approved Nocturne Notes source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Configure Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify approved UI and packaged resources
+        run: npm run verify:visual
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Test SQLite, recovery and Windows shell
+        run: npm test
+      - name: Test actual Electron desktop layout
+        run: npm run test:ui
+      - name: Prepare Windows icon from accepted logo (no redesign)
+        shell: pwsh
+        run: |
+          python -m pip install --disable-pip-version-check --quiet Pillow==11.3.0 pefile==2024.8.26
+          python scripts/prepare-windows-icon.py
+          if (!(Test-Path -LiteralPath 'assets/nocturne-notes-refined.ico')) { throw 'Refined icon not generated' }
+      - name: Build NSIS Installer and Portable EXE
+        run: npm run build:win
+      - name: Verify both EXEs and English/Russian locales
+        shell: pwsh
+        run: |
+          $files = @('dist/Nocturne Notes Portable.exe','dist/Nocturne Notes Setup 2.0.0.exe')
+          foreach ($file in $files) {
+            if (!(Test-Path -LiteralPath $file)) { throw "Missing: $file" }
+            if ((Get-Item -LiteralPath $file).Length -lt 10000000) { throw "Unexpectedly small: $file" }
+          }
+          $localeDir = 'dist/win-unpacked/locales'
+          $actual = @(Get-ChildItem -LiteralPath $localeDir -Filter '*.pak' | Select-Object -ExpandProperty Name | Sort-Object)
+          $expected = @('en-US.pak', 'ru.pak') | Sort-Object
+          if (($actual -join '|') -ne ($expected -join '|')) { throw "Unexpected locales: $($actual -join ', ')" }
+          Write-Host "Locales: $($actual -join ', ')"
+          $hashes = foreach ($file in $files) {
+            $hash = Get-FileHash -LiteralPath $file -Algorithm SHA256
+            "$($hash.Hash.ToLowerInvariant())  $(Split-Path $file -Leaf)"
+          }
+          $hashes | Set-Content -LiteralPath 'dist/SHA256SUMS.txt' -Encoding ascii
+          Get-Content 'dist/SHA256SUMS.txt'
+      - name: Verify packaged application file list
+        run: node scripts/verify-package.js
+      - name: Verify actual embedded executable icons
+        run: python scripts/verify-exe-icons.py assets/nocturne-notes-refined.ico 'dist/win-unpacked/Nocturne Notes.exe' 'dist/Nocturne Notes Portable.exe' 'dist/Nocturne Notes Setup 2.0.0.exe'
+      - name: Verify installation, shortcut icons and uninstall
+        shell: pwsh
+        run: ./scripts/test-installer.ps1
+      - name: Publish Windows Portable
+        uses: actions/upload-artifact@v4
+        with:
+          name: Nocturne-Notes-2.0.0-Windows-Portable
+          path: dist/Nocturne Notes Portable.exe
+          if-no-files-found: error
+          retention-days: 90
+      - name: Publish Windows Installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: Nocturne-Notes-2.0.0-Windows-Installer
+          path: dist/Nocturne Notes Setup 2.0.0.exe
+          if-no-files-found: error
+          retention-days: 90
+      - name: Publish SHA256 checksums
+        uses: actions/upload-artifact@v4
+        with:
+          name: Nocturne-Notes-2.0.0-SHA256
+          path: dist/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 90
+      - name: Capture real application screenshots
+        run: npx --no-install electron scripts/capture-release-screenshots.js
+      - name: Publish stable release (never replace an existing release)
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $existing = gh release list --repo $env:GITHUB_REPOSITORY --limit 100 --json tagName | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0) { throw 'Could not list existing releases' }
+          if ($existing.tagName -contains 'v2.0.0') {
+            Write-Host 'v2.0.0 already exists; preserving its binaries'
+          } else {
+            gh release create v2.0.0 --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title 'Nocturne Notes 2.0.0' --notes-file RELEASE_NOTES.md --latest 'dist/Nocturne Notes Setup 2.0.0.exe' 'dist/Nocturne Notes Portable.exe' 'dist/SHA256SUMS.txt' 'dist/Nocturne-Notes-Editor.png' 'dist/Nocturne-Notes-Settings.png'
+            if ($LASTEXITCODE -ne 0) { throw 'Release publication failed' }
+          }
+          gh release view v2.0.0 --repo $env:GITHUB_REPOSITORY --json url,assets
+          if ($LASTEXITCODE -ne 0) { throw 'Could not verify release' }

@@ -1,0 +1,626 @@
+:root {color-scheme: dark; --paper:#010101;--shell:#090909;--stroke:rgba(224,224,231,.24);--text:#eaeaea;--muted:#97979b;--sidebar-w:205px;--top-h:48px;--font-size:21px;}
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;}body{font-family:"Segoe UI Variable Text","Segoe UI",Inter,Arial,sans-serif;background:#000;color:var(--text);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;overflow:hidden}
+button,input{font:inherit}button{cursor:pointer;color:inherit;-webkit-tap-highlight-color:transparent}button:focus-visible,input:focus-visible,.editor:focus-visible{outline:1px solid #aeaeae;outline-offset:2px}
+button:disabled{opacity:.35;cursor:default}svg:not(.glass-wave){width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+[hidden]{display:none!important}
+.desktop{height:100dvh;width:100vw;display:flex;align-items:center;justify-content:center;padding:48px;background:radial-gradient(ellipse 60% 80% at 50% 50%,#0b0b0b 0%,#030303 55%,#000 100%)}
+.window{position:relative;display:flex;flex-direction:column;width:min(1444px,100%);height:min(820px,calc(100dvh - 100px));min-width:700px;min-height:460px;isolation:isolate;overflow:hidden;border-radius:29px;border:1px solid rgba(212,214,221,.51);background:linear-gradient(180deg,#0c0c0d,#050505 65%);box-shadow:0 40px 100px #000b,0 10px 30px #0009,inset 0 0 0 1px #ffffff07,inset 0 1px 0 #ffffff30}
+.window::after{content:"";pointer-events:none;position:absolute;inset:0;z-index:60;border-radius:inherit;box-shadow:inset 0 1px 1px #fff3,inset 0 -1px 2px #fff1}
+.titlebar{height:var(--top-h);min-height:var(--top-h);display:flex;gap:16px;align-items:center;position:relative;z-index:9;padding-left:18px;background:linear-gradient(180deg,#ffffff16,#ffffff07 38%,#ffffff06 78%,#00000033),radial-gradient(ellipse 20% 130% at 80% -15%,#e8e8f238,transparent 80%),linear-gradient(100deg,#111113e8 0%,#111113d6 42%,#1d1d21bd 64%,#121214de 100%);border-bottom:1px solid #ffffff20;box-shadow:inset 0 1px 0 #ffffff20,0 4px 9px #0005;backdrop-filter:blur(22px) saturate(108%);-webkit-backdrop-filter:blur(22px) saturate(108%);-webkit-app-region:drag;user-select:none}
+.titlebar::before{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(143deg,transparent 13%,#ffffff05 24%,transparent 30%,transparent 54%,#ffffff0c 77%,transparent 88%),radial-gradient(ellipse 12% 170% at 75% -120%,#ffffff38,transparent);mix-blend-mode:screen}
+.glass-wave{position:absolute;inset:0;width:100%;height:100%;opacity:.87;pointer-events:none;filter:drop-shadow(0 0 7px #ffffff20)}
+.no-drag,.no-drag *{-webkit-app-region:no-drag}.glass-round{display:grid;place-items:center;flex:0 0 auto;border-radius:50%;background:linear-gradient(145deg,#ffffff16,#ffffff0a 65%,#00000019);border:1px solid #ffffff0e;box-shadow:inset 0 1px 1px #ffffff13,0 4px 10px #0009;color:#ebebed;transition:background .15s,border-color .15s,transform .15s}
+.glass-round:hover{background:linear-gradient(140deg,#ffffff30,#ffffff12 70%,#00000016);border-color:#ffffff28}
+.glass-round:active{transform:scale(.95)}.hamburger{width:35px;height:35px;position:relative;z-index:1}.hamburger svg{width:18px;height:18px;stroke-width:1.7}.app-name{font-size:15px;font-weight:420;letter-spacing:-.02em;color:#efefef;position:relative;z-index:1;white-space:nowrap}
+.drag-space{flex:1;height:100%}.window-controls{position:relative;z-index:2;display:flex;align-self:center;margin:0 12px 0 auto;height:34px;border-radius:30px;background:linear-gradient(150deg,#ffffff0e,#ffffff06);border:1px solid #ffffff0b;overflow:hidden;box-shadow:inset 0 1px 0 #ffffff10,0 2px 11px #0007}
+.window-controls button{background:none;border:0;border-right:1px solid #ffffff0b;width:49px;height:32px;display:grid;place-items:center;transition:background .15s}.window-controls button:last-child{border-right:0}.window-controls button svg{width:15px;height:15px;stroke-width:1.8}.window-controls button:first-child svg{width:17px}.window-controls button:hover{background:#ffffff20}.window-controls button:last-child:hover{background:#b85d5e5c}
+.workarea{display:flex;flex:1;min-height:0;position:relative;overflow:hidden;background:radial-gradient(ellipse 80% 200% at 0% 80%,#101012 0%,transparent 65%),#070707}
+.sidebar{width:var(--sidebar-w);min-width:var(--sidebar-w);position:relative;display:flex;flex-direction:column;border-right:1px solid #ffffff21;background:linear-gradient(90deg,#0a0a0b,#090909 85%,#101011);transition:width .24s ease,min-width .24s ease;z-index:3}
+.note-list{display:flex;flex-direction:column;gap:4px;flex:1;overflow-y:auto;min-height:0;padding:14px 19px 12px 20px;scrollbar-color:#2e2e2e transparent;scrollbar-width:thin}
+.note-row{display:block;width:100%;padding:10px 13px;border:1px solid transparent;background:transparent;border-radius:12px;min-height:40px;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:16px;font-weight:350;letter-spacing:-.035em;color:#a2a2a6;transition:background .16s,color .16s,border-color .16s;user-select:none}
+.note-row:hover{color:#eee;background:#ffffff0a}.note-row.active{color:#f1f1f2;background:linear-gradient(120deg,#eeeeef27,#ffffff10 65%,#ffffff0b);border-color:#ffffff08;box-shadow:inset 0 1px 0 #ffffff0e,0 3px 13px #0002}
+.note-row.dragging{opacity:.4}.note-row.drag-target{border-top:1px solid #a7a7b1}
+.sidebar-footer{height:83px;flex:0 0 83px;position:relative;margin:0 19px 0 20px;border-top:1px solid #ffffff16;display:flex;justify-content:center;align-items:center}
+.add-note{width:42px;height:42px}.add-note svg{width:23px;height:23px;stroke-width:1.5}
+.sidebar-tab{position:absolute;right:-1px;top:50%;transform:translateY(-50%);height:75px;width:39px;z-index:4;border:1px solid #ffffff17;border-right:0;border-radius:35px 0 0 35px;background:radial-gradient(ellipse 100% 100% at 90% 50%,#202021,#0d0d0e 75%);box-shadow:inset 1px 0 0 #ffffff05,-5px 0 12px #0008;display:flex;align-items:center;justify-content:center;padding-left:10px;transition:background .2s}
+.sidebar-tab:hover{background:radial-gradient(ellipse at 90% 50%,#343437,#171719 74%)}.sidebar-tab svg{height:19px;width:19px;stroke-width:1.75}
+.sidebar.collapsed{width:21px;min-width:21px}.sidebar.collapsed .note-list,.sidebar.collapsed .sidebar-footer{display:none}.sidebar.collapsed .sidebar-tab{width:24px;height:70px;padding-left:0;border-radius:0 32px 32px 0;right:-23px;border-right:1px solid #ffffff23;border-left:0;box-shadow:inset -1px 0 0 #ffffff07,3px 0 11px #0007}.sidebar.collapsed .sidebar-tab svg{transform:rotate(180deg)}
+.editor-outer{position:relative;flex:1;min-width:0;min-height:0;padding:10px 11px 11px 9px;background:linear-gradient(135deg,#080808,#090909)}
+.editor-surface{width:100%;height:100%;overflow:hidden;border:1px solid #ffffff24;border-radius:23px;background:radial-gradient(ellipse 100% 110% at 50% 60%,#000 63%,#020202 100%);box-shadow:inset 0 2px 12px #000,inset 0 0 20px #000,0 0 0 1px #0009;position:relative}
+.editor-surface::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;box-shadow:inset 0 1px 1px #ffffff06,inset 0 -1px 4px #ffffff06}
+.editor-scroll{overflow:auto;width:100%;height:100%;padding:32px clamp(25px,4.2vw,59px) 70px;scrollbar-width:thin;scrollbar-color:#333 transparent}
+.note-title{display:block;min-width:0;width:100%;padding:0;margin:1px 0 18px;color:#f1f1f3;font-size:clamp(27px,3.1vw,40px);font-weight:560;letter-spacing:-.049em;line-height:1.35;border:0;outline:none;background:none;caret-color:#e7e7e7;font-family:inherit;text-overflow:ellipsis}.note-title::placeholder{color:#656569}.note-title:focus{outline:none}
+.editor{font-size:var(--font-size);font-weight:350;letter-spacing:-.024em;line-height:1.64;color:#c2c2c5;min-height:360px;outline:0;white-space:pre-wrap;overflow-wrap:anywhere;caret-color:#e5e5e5}.editor:focus-visible{outline:none}.editor p{margin:0 0 .72em}.editor h1,.editor h2{color:#eee;line-height:1.28;margin:1.1em 0 .42em;font-weight:540;letter-spacing:-.04em}.editor h1{font-size:1.6em}.editor h2{font-size:1.28em}.editor ul,.editor ol{margin:.15em 0 .8em;padding-left:1.35em}.editor li{padding-left:.1em}.editor a{color:#c6bddc;text-decoration:underline;text-decoration-color:#8e839e}.editor blockquote{border-left:2px solid #797979;padding-left:14px;color:#b2b2b2;margin:1em 0}.editor:empty::before{content:attr(data-placeholder);color:#56565a;pointer-events:none}.editor ::selection,.note-title::selection{background:#625078;color:#fff}.editor p:empty::before{content:'\00a0'}
+.floating-toolbar{position:absolute;display:flex;align-items:center;gap:2px;padding:7px 9px;height:53px;min-width:max-content;border:1px solid #ffffff40;border-radius:24px;z-index:22;background:linear-gradient(145deg,#77777f30 0%,#2d2d3350 35%,#151518ec 80%),rgba(24,24,27,.94);box-shadow:inset 0 1px 2px #ffffff36,inset 0 -1px 1px #ffffff0b,0 12px 30px #000c,0 1px 3px #0009;backdrop-filter:blur(22px) saturate(115%);-webkit-backdrop-filter:blur(22px) saturate(115%);user-select:none}
+.floating-toolbar button{width:36px;height:36px;display:grid;place-items:center;flex-shrink:0;border:0;border-radius:12px;background:transparent;color:#dedee0;font-size:21px;line-height:1;transition:background .13s,color .13s}.floating-toolbar button:hover,.floating-toolbar button.selected{background:#ffffff1b;color:white}.floating-toolbar button svg{width:21px;height:21px;stroke-width:1.65}.floating-toolbar button.format-bold{background:linear-gradient(135deg,#ffffff2c,#ffffff0b);box-shadow:inset 0 1px 0 #ffffff18;color:white}.floating-toolbar button.heading-button{font-size:20px;letter-spacing:-.06em}.floating-toolbar button.heading-button small{font-size:12px;margin-left:1px}.floating-toolbar .tool-divider{width:1px;height:29px;background:#ffffff1c;margin:0 5px}.floating-toolbar button.color-button{width:55px;display:flex;gap:5px;padding:0 6px 0 7px}.color-ring{display:block;width:23px;height:23px;border-radius:50%;border:2px solid #b9a0dd;box-shadow:0 0 0 4px #ad93ce12,0 0 8px #aa8dc63b}.floating-toolbar button svg.small-arrow{width:14px;height:14px}
+.color-popover{position:absolute;z-index:31;display:flex;gap:10px;padding:12px;background:linear-gradient(140deg,#323236,#141415);border:1px solid #ffffff32;border-radius:20px;box-shadow:0 10px 25px #000b;backdrop-filter:blur(22px)}.color-popover button{border:2px solid #ffffff33;width:24px;height:24px;border-radius:50%;background:var(--swatch)}.color-popover button:hover{box-shadow:0 0 0 3px #ffffff21}
+.glass-menu{position:absolute;z-index:35;left:16px;top:53px;width:302px;padding:9px;overflow:hidden;border-radius:20px;border:1px solid #ffffff2d;background:linear-gradient(145deg,#353539b5,#1c1c20f0 23%,#141416f6 80%);box-shadow:inset 0 1px 1px #ffffff26,0 18px 40px #000e;backdrop-filter:blur(29px) saturate(110%);-webkit-backdrop-filter:blur(29px) saturate(110%)}
+.glass-menu button{display:flex;align-items:center;width:100%;gap:12px;min-height:38px;padding:8px 11px;border:0;background:transparent;border-radius:11px;text-align:left;font-size:13px;font-weight:420;letter-spacing:-.012em;color:#e1e1e2;transition:background .13s}.glass-menu button:hover{background:#ffffff17;color:#fff}.glass-menu button svg{width:18px;height:18px;color:#b2b2b9;stroke-width:1.55}.glass-menu button span{flex:1}.glass-menu button kbd{font:11px/1.3 "Segoe UI",sans-serif;color:#96969b;white-space:nowrap}.glass-menu button svg.chevron{width:14px;height:14px}.glass-menu button.danger{color:#eea9a9}.menu-divider{height:1px;background:#ffffff1b;margin:7px 8px}.submenu{left:328px;top:90px;width:250px}.submenu button{font-size:12.5px}.submenu .empty-recent{font-size:12px;color:#999;padding:12px}.context-menu{left:0;top:0;width:216px}
+.dialog-backdrop{position:absolute;inset:0;z-index:45;display:grid;place-items:center;background:#0008;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}.glass-dialog{width:min(415px,calc(100% - 30px));padding:22px 24px 20px;border:1px solid #ffffff35;border-radius:23px;background:linear-gradient(130deg,#333337ee,#18181af5 42%,#111114fa);box-shadow:inset 0 1px 0 #ffffff23,0 20px 50px #000e}.glass-dialog h2{margin:0 0 12px;font-size:18px;font-weight:550;letter-spacing:-.02em}.dialog-message{font-size:13px;color:#b6b6b9;line-height:1.65}.dialog-input{width:100%;margin-top:12px;padding:12px 13px;border-radius:12px;border:1px solid #ffffff32;background:#0006;color:#fff;outline:0}.dialog-input:focus{border-color:#ffffff70}.dialog-options{display:grid;gap:13px;margin-top:15px;color:#d5d5d6;font-size:13px}.dialog-options label{display:flex;gap:11px;align-items:center}.dialog-options select{background:#111;color:white;border:1px solid #ffffff30;border-radius:9px;padding:6px}.dialog-buttons{display:flex;justify-content:flex-end;gap:9px;margin-top:22px}.dialog-buttons button{padding:9px 15px;border-radius:10px;border:1px solid #ffffff16;background:#ffffff0f;font-size:12px}.dialog-buttons .dialog-primary{background:#eeeeef;color:#101010;font-weight:600}.dialog-buttons button:hover{filter:brightness(1.15)}
+.toast{position:absolute;bottom:20px;right:25px;z-index:50;border:1px solid #ffffff30;border-radius:99px;padding:10px 15px;background:#232326e8;backdrop-filter:blur(15px);box-shadow:0 7px 20px #0009;font-size:12px;color:#eee;pointer-events:none}
+body.is-electron .desktop{padding:8px;background:transparent}body.is-electron .window{width:100%;height:100%;min-width:0;min-height:0}
+.window.is-maximized{border-radius:13px}body.is-electron .window.is-maximized{border-radius:8px}
+@media (max-width:940px){.desktop{padding:20px}.window{height:calc(100dvh - 40px)}:root{--sidebar-w:185px}.note-list{padding-left:13px;padding-right:13px}.editor-scroll{padding-left:30px;padding-right:30px}.floating-toolbar{transform:scale(.91);transform-origin:top left}}
+@media (max-width:720px){.desktop{padding:0}.window{min-width:0;width:100%;height:100%;border-radius:0}:root{--sidebar-w:155px;--font-size:18px}.note-list{padding:12px 10px}.note-row{font-size:14px;padding:8px}.app-name{font-size:13px}.window-controls{margin-right:6px}.window-controls button{width:38px}.titlebar{padding-left:9px;gap:9px}.editor-scroll{padding:22px 20px}}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+/* Locked Nocturne Notes reference proportions (1536×1024 design canvas). */
+:root{--sidebar-w:240px;--font-size:26px}
+.window{height:min(790px,calc(100dvh - 100px))}
+.note-list{padding-top:27px;gap:3px}
+.note-row{font-size:19px;min-height:49px;padding:12px 13px}
+.sidebar-footer{height:95px;flex-basis:95px}
+.add-note{height:52px;width:52px}
+.note-title{font-size:clamp(30px,3.2vw,43px);margin-bottom:104px}
+.editor{margin-left:17px}
+.window-controls{height:38px}
+.window-controls button{width:62px;height:36px}
+.floating-toolbar{height:59px;padding:8px 10px;border-radius:26px}
+.floating-toolbar button{width:39px;height:40px;font-size:23px}
+.floating-toolbar button.heading-button{font-size:22px}
+.floating-toolbar button.color-button{width:58px}
+@media (max-width:940px){:root{--sidebar-w:200px;--font-size:23px}.note-row{font-size:17px}.note-title{margin-bottom:76px}}
+@media (max-width:720px){:root{--sidebar-w:155px;--font-size:19px}.note-row{font-size:15px;min-height:40px}.note-title{margin-bottom:45px}.window-controls button{width:38px}.floating-toolbar{transform:scale(.85);transform-origin:top left}}
+
+/* v0.1.1 – narrower notes list and truly flush collapse (approved layout preserved). */
+.sidebar.collapsed{width:0;min-width:0;border-right:0;background:transparent}
+.sidebar.collapsed .sidebar-tab{right:-25px;z-index:8}
+.sidebar.collapsed + .editor-outer{padding-left:11px}
+.note-row{font-family:"Segoe UI Variable Text","Segoe UI",Arial,sans-serif;font-size:15px;font-weight:350;letter-spacing:-.015em;line-height:1.25;min-height:36px;padding:7px 12px;border-radius:10px}
+.note-list{gap:3px}
+.editor{line-height:var(--line-height,1.64)}
+body.motion-reduced *,body.motion-reduced *::before,body.motion-reduced *::after{transition-duration:0s!important;animation-duration:0s!important;scroll-behavior:auto!important}
+/* Settings share the same restrained black-glass surfaces as the application. */
+.dialog-backdrop.settings-open .glass-dialog{width:min(484px,calc(100% - 26px));max-height:min(660px,calc(100dvh - 40px));overflow:auto}
+.dialog-backdrop.settings-open .dialog-message{display:none}
+.dialog-backdrop.settings-open .dialog-options{gap:0;margin-top:2px}
+.settings-group{padding:8px 0 4px}
+.settings-group + .settings-group{border-top:1px solid #ffffff19;margin-top:8px;padding-top:17px}
+.settings-caption{font-size:10px;letter-spacing:.12em;font-weight:600;color:#96969b;text-transform:uppercase;margin-bottom:7px}
+.setting-row{min-height:51px;display:flex;justify-content:space-between;align-items:center;gap:20px;padding:8px 2px}
+.setting-row .setting-copy{display:flex;flex-direction:column;gap:3px;min-width:0}
+.setting-row .setting-copy strong{font-size:13px;font-weight:440;color:#e6e6e7;line-height:1.3}
+.setting-row .setting-copy small{font-size:11px;color:#85858b;line-height:1.4}
+.setting-row select{flex:0 0 auto;min-width:113px;max-width:155px;padding:7px 10px;background:#111113;color:#e9e9e9;border:1px solid #ffffff25;border-radius:10px;font-size:12px;outline:none}
+.setting-row select:focus-visible{border-color:#ffffff66}
+.setting-row input[type="checkbox"]{appearance:none;-webkit-appearance:none;flex:0 0 auto;width:36px;height:21px;margin:0;border:1px solid #ffffff22;border-radius:30px;background:#303033;position:relative;cursor:pointer;transition:background .18s}
+.setting-row input[type="checkbox"]::before{content:"";position:absolute;left:3px;top:3px;width:13px;height:13px;background:#a9a9ac;border-radius:50%;box-shadow:0 1px 3px #0009;transition:transform .18s,background .18s}
+.setting-row input[type="checkbox"]:checked{background:#727277}
+.setting-row input[type="checkbox"]:checked::before{transform:translateX(15px);background:#fff}
+.setting-row input[type="checkbox"]:focus-visible{outline:1px solid #b8b8b8;outline-offset:2px}
+.setting-row input:disabled{opacity:.35;cursor:not-allowed}
+.setting-row.is-disabled{opacity:.55}
+@media(max-width:940px){.note-row{font-size:14px;min-height:35px;padding:7px 11px}}
+@media(max-width:720px){.note-row{font-size:13px;min-height:33px;padding:7px 9px}.setting-row{gap:10px}.setting-row select{min-width:96px}}
+
+/* Nocturne Notes 0.1.2: the approved black design with precise controls. */
+.sidebar{flex-shrink:0}
+.sidebar-resizer{position:absolute;z-index:9;right:-5px;top:3px;bottom:3px;width:10px;cursor:col-resize;touch-action:none;outline:none}
+.sidebar-resizer::after{content:"";position:absolute;left:4px;top:0;bottom:0;width:1px;background:transparent;transition:background .15s}
+.sidebar-resizer:hover::after,.sidebar-resizer:focus-visible::after,body.sidebar-resizing .sidebar-resizer::after{background:#ffffff55}
+.sidebar-resizer:focus-visible{outline:0}
+body.sidebar-resizing,body.sidebar-resizing *{cursor:col-resize!important;user-select:none!important}
+body.sidebar-resizing .sidebar{transition:none!important}
+.sidebar.collapsed .sidebar-resizer{display:none}
+.sidebar-tab{width:32px;height:57px;border-radius:29px 0 0 29px;padding-left:7px}
+.sidebar-tab svg{width:16px;height:16px}
+.sidebar.collapsed .sidebar-tab{width:22px;height:56px;right:-21px;border-radius:0 28px 28px 0}
+.sidebar-footer{height:75px;flex-basis:75px}
+.add-note{height:37px;width:37px}
+.add-note svg{width:19px;height:19px}
+.note-title{font-size:clamp(24px,2.15vw,31px);font-weight:510;line-height:1.22;letter-spacing:-.035em;margin:0 0 20px}
+.editor{margin-left:0;line-height:var(--line-height,1.64)}
+.editor h1,.editor h2,.editor h3,.editor h4,.editor h5,.editor h6{color:#ededee;line-height:1.26;font-weight:535;letter-spacing:-.035em;margin:.7em 0 .36em}
+.editor h1{font-size:1.75em}.editor h2{font-size:1.52em}.editor h3{font-size:1.35em}.editor h4{font-size:1.19em}.editor h5{font-size:1.08em}.editor h6{font-size:1em;color:#bcbcc1}
+.floating-toolbar button.heading-picker{width:68px;display:flex;justify-content:center;gap:5px;font-size:18px;font-weight:480}
+.floating-toolbar .heading-picker svg.small-arrow{width:13px;height:13px}
+.glass-popover{position:absolute;z-index:32;background:linear-gradient(150deg,#323236ef,#171719f6 38%,#0e0e0ff8);border:1px solid #ffffff32;box-shadow:inset 0 1px 0 #ffffff22,0 15px 35px #000d;backdrop-filter:blur(25px);-webkit-backdrop-filter:blur(25px);border-radius:19px;padding:11px}
+.popover-caption{color:#a4a4aa;font-size:10px;font-weight:580;letter-spacing:.075em;text-transform:uppercase;padding:2px 4px 9px}
+.heading-popover{width:248px;max-height:min(430px,65vh);overflow:auto}
+.heading-option{display:flex;align-items:center;gap:13px;width:100%;border:0;border-radius:11px;background:transparent;padding:8px 10px;color:#d3d3d6;font-size:12px;text-align:left}
+.heading-option:hover,.heading-option.active{background:#ffffff17;color:white}
+.heading-sample{display:flex;align-items:center;justify-content:flex-start;width:47px;color:#eeeeef;font-weight:560}
+.heading-h1{font-size:25px}.heading-h2{font-size:22px}.heading-h3{font-size:19px}.heading-h4{font-size:17px}.heading-h5{font-size:15px}.heading-h6{font-size:13px}.heading-p{font-size:16px;font-weight:420}
+.color-popover{display:block;width:224px;padding:11px}
+.color-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;padding:4px}
+.color-grid .palette-swatch{width:27px;height:27px;display:block;margin:auto;border:1px solid #ffffff42;border-radius:50%;background:var(--swatch);transition:transform .12s,box-shadow .12s}
+.color-grid .palette-swatch:hover,.color-grid .palette-swatch:focus-visible{transform:scale(1.12);box-shadow:0 0 0 3px #ffffff32}
+.dialog-backdrop.settings-open .glass-dialog{overflow:visible;max-height:min(600px,calc(100dvh - 40px))}
+.dialog-backdrop.settings-open .dialog-options{overflow:visible}
+.dialog-backdrop.settings-open .glass-dialog{width:min(520px,calc(100% - 26px))}
+.dialog-backdrop.settings-open .dialog-options{gap:0}
+.glass-select{position:relative;width:145px;flex:0 0 145px}
+.glass-select-trigger{display:flex;align-items:center;justify-content:space-between;gap:9px;width:100%;min-height:35px;background:linear-gradient(150deg,#ffffff15,#ffffff07);border:1px solid #ffffff29;border-radius:11px;padding:7px 10px;font-size:12px;color:#e6e6e8;text-align:left;box-shadow:inset 0 1px 0 #ffffff0c}
+.glass-select-trigger:hover,.glass-select-trigger[aria-expanded="true"]{background:#ffffff1d;border-color:#ffffff42}
+.glass-select-trigger svg{width:14px;height:14px;color:#aaa}
+.glass-select-list{position:absolute;right:0;top:calc(100% + 5px);z-index:20;width:100%;padding:5px;border-radius:13px;border:1px solid #ffffff34;background:linear-gradient(150deg,#303034,#101011 64%);box-shadow:inset 0 1px 0 #ffffff20,0 13px 25px #000c;backdrop-filter:blur(24px)}
+.glass-select-list button{display:block;width:100%;padding:9px;border-radius:8px;border:0;background:transparent;color:#ccc;text-align:left;font-size:12px}
+.glass-select-list button:hover,.glass-select-list button[aria-selected="true"]{background:#ffffff1c;color:white}
+.font-setting{display:block;padding-bottom:10px}
+.font-setting .font-controls{display:flex;align-items:center;gap:11px;margin-top:13px}
+.font-step{display:grid;place-items:center;width:30px;height:30px;flex-shrink:0;background:#ffffff12;border:1px solid #ffffff25;border-radius:10px;font-size:18px}
+.font-step:hover{background:#ffffff25}
+.font-controls input[type="range"]{appearance:none;-webkit-appearance:none;flex:1;min-width:70px;height:5px;border-radius:99px;background:linear-gradient(90deg,#8f8f98,#343439);outline:0;cursor:pointer}
+.font-controls input[type="range"]::-webkit-slider-thumb{appearance:none;-webkit-appearance:none;width:15px;height:15px;border-radius:50%;background:#efeff1;border:2px solid #8b8b91;box-shadow:0 2px 7px #000a}
+.font-controls input[type="range"]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:#efeff1;border:2px solid #8b8b91}
+.font-readout{font-size:12px;color:#e5e5e7;min-width:38px;text-align:right;font-variant-numeric:tabular-nums}
+.settings-group + .settings-group{margin-top:9px}
+@media(max-width:720px){.note-title{font-size:25px;margin-bottom:16px}.sidebar-tab{height:54px}.glass-select{width:124px;flex-basis:124px}.settings-group .setting-row{gap:10px}}
+
+/* Alternative note-title size, without altering the approved standard appearance. */
+.window.small-note-title .note-title{font-size:clamp(20px,1.65vw,24px)}
+
+/* Nocturne Notes 0.1.5 — motion-only refinements. No visual or spacing changes. */
+/* Animate only one flex dimension instead of competing width and min-width transitions. */
+.sidebar{
+  flex: 0 0 var(--sidebar-w);
+  min-width:0;
+  transition: flex-basis 165ms cubic-bezier(.22,1,.36,1);
+}
+.sidebar.collapsed{
+  flex-basis:0;
+  min-width:0;
+}
+/* Sidebar content fades rather than disappearing on the first animation frame. */
+.sidebar .note-list,.sidebar .sidebar-footer{
+  transition:opacity 95ms ease-out, visibility 0s linear 0s;
+}
+.sidebar.collapsed .note-list{
+  display:flex;
+  opacity:0;
+  visibility:hidden;
+  pointer-events:none;
+  transition:opacity 95ms ease-out, visibility 0s linear 95ms;
+}
+.sidebar.collapsed .sidebar-footer{
+  display:flex;
+  opacity:0;
+  visibility:hidden;
+  pointer-events:none;
+  transition:opacity 95ms ease-out, visibility 0s linear 95ms;
+}
+.sidebar-tab{transition:background 110ms ease-out}
+.sidebar-tab svg{transition:transform 145ms cubic-bezier(.22,1,.36,1)}
+.note-row{transition:background 100ms ease-out,color 100ms ease-out,border-color 100ms ease-out}
+.glass-round{transition:background 110ms ease-out,border-color 110ms ease-out,transform 110ms ease-out}
+.window-controls button{transition:background 95ms ease-out}
+.floating-toolbar button,.glass-menu button{transition:background 95ms ease-out,color 95ms ease-out}
+.glass-select-trigger,.glass-select-list button{transition:background 100ms ease-out,border-color 100ms ease-out}
+.glass-menu:not([hidden]),.glass-popover:not([hidden]),.floating-toolbar:not([hidden]){
+  animation:glass-motion-enter 100ms ease-out both;
+}
+@keyframes glass-motion-enter{from{opacity:0}to{opacity:1}}
+/* Never interfere with a user's reduced-motion preference or live drag-resizing. */
+body.sidebar-resizing .sidebar{transition:none!important}
+@media(prefers-reduced-motion:reduce){
+  .glass-menu:not([hidden]),.glass-popover:not([hidden]),.floating-toolbar:not([hidden]){animation:none!important}
+}
+
+
+/* Nocturne Notes 0.1.6 — visual refinements requested after the locked 0.1.5 design. */
+/* Equal 10px inset all four sides of the editing surface, including collapsed sidebar. */
+.editor-outer,
+.sidebar.collapsed + .editor-outer{padding:10px}
+
+/* Reduce the stark single-pixel contrast at the rounded outer edge (subpixel aliasing
+   remains device / OS scaling dependent). Keep the same black shell and radius. */
+.window{border-color:rgba(212,214,221,.32);box-shadow:0 40px 100px #000b,0 10px 30px #0009,inset 0 0 0 1px #ffffff07,inset 0 1px 0 #ffffff26}
+.window::after{box-shadow:inset 0 1px 1px #ffffff29,inset 0 -1px 2px #ffffff16}
+
+/* More immediate controls without changing their rest position or layout. */
+.sidebar{transition:flex-basis 118ms cubic-bezier(.2,.8,.25,1)}
+.sidebar .note-list,.sidebar .sidebar-footer{transition:opacity 65ms ease-out,visibility 0s linear 0s}
+.sidebar.collapsed .note-list,.sidebar.collapsed .sidebar-footer{transition:opacity 65ms ease-out,visibility 0s linear 65ms}
+.sidebar-tab{transition:background 75ms ease-out}
+.sidebar-tab svg{transition:transform 98ms cubic-bezier(.2,.8,.25,1)}
+.note-row,.glass-round{transition:background 75ms ease-out,color 75ms ease-out,border-color 75ms ease-out,transform 75ms ease-out}
+.window-controls button,.floating-toolbar button,.glass-menu button,.glass-select-trigger,.glass-select-list button{transition:background 75ms ease-out,color 75ms ease-out,border-color 75ms ease-out}
+.glass-menu:not([hidden]),.glass-popover:not([hidden]),.floating-toolbar:not([hidden]){animation-duration:75ms;will-change:opacity}
+
+/* Main menu is more compact; keep context menus and submenu width independent. */
+#app-menu{width:245px;padding:8px}
+#app-menu button{min-height:37px;gap:10px;padding:7px 10px}
+#app-menu button svg{width:17px;height:17px}
+#app-menu .menu-divider{margin:6px 7px}
+#submenu{left:267px}
+
+/* Standard gear icon is in the shared SVG symbols. Slightly more expressive close. */
+.window-controls button:last-child{color:#dfa2a4;background:linear-gradient(140deg,#962f333b,#6b20252b)}
+.window-controls button:last-child:hover{background:#b84049a1;color:#fff0f0}
+
+/* Compact glass selection toolbar — its layout / anchoring remain unchanged. */
+.floating-toolbar{height:44px;padding:5px 7px;gap:1px;border-radius:20px;backdrop-filter:blur(19px) saturate(115%);-webkit-backdrop-filter:blur(19px) saturate(115%)}
+.floating-toolbar button{width:30px;height:30px;border-radius:9px;font-size:17px}
+.floating-toolbar button svg{width:17px;height:17px}
+.floating-toolbar .tool-divider{height:21px;margin:0 3px}
+.floating-toolbar button.heading-picker{width:55px;gap:3px;font-size:15px}
+.floating-toolbar .heading-picker svg.small-arrow{width:11px;height:11px}
+.floating-toolbar button.color-button{width:40px;gap:3px;padding:0 3px}
+.floating-toolbar button svg.small-arrow{width:11px;height:11px}
+.color-ring{width:17px;height:17px;border-width:1.5px;box-shadow:0 0 0 2px #ad93ce12,0 0 7px #aa8dc63b}
+@media (max-width:940px){.floating-toolbar{transform:none}}
+@media (max-width:720px){.floating-toolbar{transform:scale(.90);transform-origin:top left}}
+
+/* Font step symbols rendered as optical-center aligned vector icons. */
+.font-step{font-size:0;line-height:0}
+.font-step svg{display:block;width:15px;height:15px;stroke-width:1.8}
+@media(prefers-reduced-motion:reduce){
+  .glass-menu:not([hidden]),.glass-popover:not([hidden]),.floating-toolbar:not([hidden]){animation:none!important}
+}
+
+
+/* Nocturne Notes 1.0 RC: precision and responsive motion; locked visual system. */
+/* The flex geometry is unchanged; containment limits repaint/reflow propagation
+   while resizing and keeps the sidebar tab free to protrude outside its panel. */
+.sidebar { contain: layout style; transition: flex-basis 96ms cubic-bezier(.33,.12,.67,.9); }
+.sidebar .note-list, .sidebar .sidebar-footer { transition: opacity 58ms linear, visibility 0s linear 0s; }
+.sidebar.collapsed .note-list, .sidebar.collapsed .sidebar-footer { transition: opacity 58ms linear, visibility 0s linear 58ms; }
+.editor-surface { contain: layout paint; }
+.sidebar-tab svg { transition: transform 96ms cubic-bezier(.33,.12,.67,.9); }
+.sidebar-tab, .glass-round, .note-row, .window-controls button,
+.floating-toolbar button, .glass-menu button, .glass-select-trigger,
+.glass-select-list button { transition-duration: 65ms; }
+.glass-menu:not([hidden]), .glass-popover:not([hidden]), .floating-toolbar:not([hidden]) { animation-duration: 65ms; }
+
+/* Soft, translucent antialiased rim in place of the hard outline.
+   Native Windows 11 corner smoothing is also enabled for the desktop window. */
+.window {
+ border:1px solid rgba(215,216,222,.13);
+ box-shadow:0 40px 100px #000b,0 10px 30px #0009,
+   0 0 0 .6px rgba(231,231,237,.15),0 0 2px 1px rgba(231,231,237,.09),
+   inset 0 0 0 1px #ffffff09,inset 0 1px 0 #ffffff1a;
+}
+.window::after { inset:.5px; border-radius:inherit;
+ box-shadow:inset 0 1px 1px #ffffff20,inset 0 -1px 2px #ffffff10; }
+
+/* Glass toolbar: symmetric padding and optical centering within the rim. */
+.floating-toolbar { height:44px; padding:0 8px; align-items:center; justify-content:center; gap:1px; }
+.floating-toolbar button { height:30px; width:30px; padding:0; margin:0;
+ display:flex;align-items:center;justify-content:center;line-height:1; }
+.floating-toolbar button.format-letter > strong,
+.floating-toolbar button.format-letter > em,
+.floating-toolbar button.format-letter > u,
+.floating-toolbar button.format-letter > s { display:block;line-height:1; }
+.floating-toolbar button.heading-picker { display:flex;align-items:center;justify-content:center;padding:0; }
+.floating-toolbar button.color-button {display:flex;align-items:center;justify-content:center;padding:0;gap:3px;}
+.floating-toolbar svg, .window-controls svg { display:block; }
+.floating-toolbar .tool-divider {align-self:center;}
+/* Bold is highlighted only when the current selection is bold. */
+.floating-toolbar button.format-bold:not(.selected) {background:transparent;box-shadow:none;color:#dedee0;}
+.floating-toolbar button.format-bold:not(.selected):hover {background:#ffffff1b;color:#fff;}
+.floating-toolbar button.format-bold.selected {background:linear-gradient(135deg,#ffffff2c,#ffffff0b);
+ box-shadow:inset 0 1px 0 #ffffff18;color:white;}
+
+/* Button frames do not steal 1px of the glyph's optical centering. */
+.window-controls button {position:relative;border:0;padding:0;display:grid;place-items:center;
+ color:#e6e6e8;background:transparent;}
+.window-controls button:not(:last-child)::after {content:"";position:absolute;right:0;top:0;bottom:0;
+ width:1px;background:#ffffff0b;pointer-events:none;}
+.window-controls button svg {display:block;margin:0;transform:none;}
+/* Neutral Close at rest, slightly stronger muted red only on hover. */
+.window-controls button:last-child {background:transparent;color:#e6e6e8;}
+.window-controls button:last-child:hover {background:rgba(153,49,55,.42);color:#f1c7c9;}
+.window-controls button:last-child:active {background:rgba(169,48,56,.55);}
+@media (prefers-reduced-motion:reduce){
+ .sidebar,.sidebar-tab svg {transition:none!important;}
+}
+
+
+/* Nocturne Notes 1.0: double the motion speed without changing the appearance.
+   Sidebar width transition 96 -> 48 ms, associated fades 58 -> 29 ms. */
+.sidebar { transition: flex-basis 48ms cubic-bezier(.33,.12,.67,.9); }
+.sidebar .note-list, .sidebar .sidebar-footer {
+  transition: opacity 29ms linear, visibility 0s linear 0s;
+}
+.sidebar.collapsed .note-list, .sidebar.collapsed .sidebar-footer {
+  transition: opacity 29ms linear, visibility 0s linear 29ms;
+}
+.sidebar-tab svg { transition: transform 48ms cubic-bezier(.33,.12,.67,.9); }
+.sidebar-tab, .glass-round, .note-row, .window-controls button,
+.floating-toolbar button, .glass-menu button, .glass-select-trigger,
+.glass-select-list button { transition-duration: 32.5ms; }
+.glass-menu:not([hidden]), .glass-popover:not([hidden]),
+.floating-toolbar:not([hidden]) { animation-duration: 32.5ms; }
+/* The remaining small interface transitions match the faster timing as well. */
+.setting-row input[type="checkbox"],
+.setting-row input[type="checkbox"]::before { transition-duration: 90ms; }
+.sidebar-resizer::after { transition-duration: 75ms; }
+.color-grid .palette-swatch { transition-duration: 60ms; }
+
+/* Vertically center each note title INSIDE its own rounded sidebar button.
+   Preserve existing button height, typography, horizontal padding and colors. */
+.note-row { display:flex; align-items:center; padding-top:0; padding-bottom:0; }
+.note-row-label { min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; display:block; }
+@media (prefers-reduced-motion:reduce) {
+  .sidebar, .sidebar-tab svg { transition:none!important; }
+}
+
+
+/* Nocturne Notes 1.1 — targeted updates, approved appearance otherwise unchanged. */
+/* Motion is now 30 ms for sidebar, toolbar, menus, and all hover affordances. */
+.sidebar { transition:flex-basis 30ms cubic-bezier(.33,.12,.67,.9); }
+.sidebar .note-list,.sidebar .sidebar-footer {
+ transition:opacity 30ms linear,visibility 0s linear 0s;
+}
+.sidebar.collapsed .note-list,.sidebar.collapsed .sidebar-footer {
+ transition:opacity 30ms linear,visibility 0s linear 30ms;
+}
+.sidebar-tab svg { transition:transform 30ms cubic-bezier(.33,.12,.67,.9); }
+.sidebar-tab,.glass-round,.note-row,.window-controls button,
+.floating-toolbar button,.glass-menu button,.glass-select-trigger,
+.glass-select-list button,.setting-row input[type="checkbox"],
+.setting-row input[type="checkbox"]::before,.sidebar-resizer::after,
+.color-grid .palette-swatch { transition-duration:30ms; }
+.glass-menu:not([hidden]),.glass-popover:not([hidden]),
+.floating-toolbar:not([hidden]){animation-duration:30ms;}
+
+/* Prevent fractional native input line-box changes at focus and selection.
+   The current font size, typography and spacing to the editor are preserved. */
+.note-title { line-height:clamp(30px,2.63vw,38px);height:clamp(30px,2.63vw,38px);text-overflow:clip; }
+.window.small-note-title .note-title {line-height:30px;height:30px;}
+@media(max-width:720px){
+ .note-title{line-height:31px;height:31px;}
+ .window.small-note-title .note-title{line-height:26px;height:26px;}
+}
+
+/* Tight main dropdown with unchanged type, icons, padding style and glass. */
+#app-menu {width:220px;}
+/* Each submenu measures its contents, rather than inheriting a fixed width.
+   Long recent project names truncate only after reaching the available space. */
+#submenu {display:flex;flex-direction:column;width:max-content;min-width:0;
+ max-width:none;overflow-x:hidden;overflow-y:auto;padding:7px;}
+#submenu button {width:100%;min-width:0;display:flex;justify-content:flex-start;
+ padding:8px 11px;gap:0;white-space:nowrap;}
+#submenu .submenu-label {flex:0 1 auto;min-width:0;display:block;
+ overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+#submenu .empty-recent {padding:8px 11px;white-space:nowrap;}
+@media (prefers-reduced-motion:reduce){
+ .sidebar,.sidebar-tab svg{transition:none!important;}
+}
+
+
+/* Nocturne Notes 1.1.1 — only the two requested spacing adjustments. */
+/* The title and body share .editor-scroll, so their left insets stay identical.
+   Horizontal right inset, vertical insets, font sizes and editor shell are unchanged. */
+.editor-scroll { padding-left:clamp(12.5px,2.1vw,29.5px); }
+/* Earlier 940px/720px rules used 30px/20px on the left respectively. */
+@media (max-width:940px) { .editor-scroll { padding-left:15px; } }
+@media (max-width:720px) { .editor-scroll { padding-left:10px; } }
+/* Compact settings dialog: preserve contents, controls, and their look. */
+.dialog-backdrop.settings-open .glass-dialog { width:min(448px,calc(100% - 26px)); }
+
+
+/* Nocturne Notes 1.2 — requested editor insets and heading spacing. */
+/* One scroll area contains the title and body. These values intentionally take
+   precedence over the older narrow-viewport padding rules. */
+.editor-scroll { padding-top:40px; padding-left:35px; padding-right:35px; }
+.note-title { margin-bottom:10px; }
+@media (max-width:720px) { .note-title { margin-bottom:6px; } }
+/* Only the new Dense line-spacing preset reduces paragraph spacing as well.
+   0.24em is one third of the previous 0.72em paragraph gap. */
+.editor p { margin-bottom:var(--paragraph-gap,.72em); }
+
+
+/* Nocturne Notes 1.2.5 — only the requested vertical editor spacing.
+   Title begins 35px below the scroll content edge. At the end of a long
+   document the editable text has exactly 35px of bottom scroll padding. */
+.editor-scroll { padding-top:35px; padding-bottom:35px; }
+/* Avoid an extra paragraph/list margin after the final block of a note.
+   This keeps the visible bottom gap at 35px when fully scrolled. */
+.editor > :last-child { margin-bottom:0; }
+
+
+/* Nocturne Notes 1.2.5 — optical 35px hotfix.
+   A 35px CSS inset was measured to the input's *line box*, but the visible
+   title glyphs start 8px lower. The following inset makes the painted first
+   letter appear 35px from the upper border in the default (standard) size.
+   The bottom visible ink similarly extends ~9px above the last paragraph's
+   line-box bottom. Use 26px and reserve a real caret gutter while typing. */
+.editor-scroll { padding-top:27px; padding-bottom:26px; }
+.window.small-note-title .editor-scroll { padding-top:29px; }
+
+
+/* Nocturne Notes 1.2.5 — optically aligned editor geometry.
+   The first note row is vertically centered at 34px below the editor-scroll
+   origin on desktop. Center the title line box with it, rather than setting
+   padding to 35px without considering the title font and line box.
+   The bottom has the SAME geometric inset as the top. */
+.editor-scroll {
+  --vertical-writing-inset: calc(34px - clamp(15px, 1.315vw, 19px));
+  padding-top: var(--vertical-writing-inset);
+  padding-bottom: var(--vertical-writing-inset);
+  padding-left: 35px;
+  padding-right: 35px;
+  /* On Windows, classic scrollbars consume width only on the right, making a
+     symmetrical 35px padding LOOK asymmetrical. Keep scrolling functional
+     (wheel, trackpad, keyboard), with the scrollbar itself unobtrusive. */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.editor-scroll::-webkit-scrollbar {width:0;height:0;display:none;}
+.window.small-note-title .editor-scroll {
+  --vertical-writing-inset: 19px;
+  padding-top: var(--vertical-writing-inset);
+  padding-bottom: var(--vertical-writing-inset);
+}
+@media (max-width:940px) {
+  .editor-scroll {--vertical-writing-inset:18.5px;}
+  .window.small-note-title .editor-scroll {--vertical-writing-inset:18.5px;}
+}
+@media (max-width:720px) {
+  .editor-scroll {--vertical-writing-inset:17px;}
+  .window.small-note-title .editor-scroll {--vertical-writing-inset:19.5px;}
+}
+/* The plus is truly centered in the footer content area, between the dividing
+   rule and the bottom edge. Remove user-agent button padding asymmetries. */
+.sidebar-footer .add-note {padding:0;place-items:center;}
+
+
+/* Nocturne Notes 1.2.5: optical bottom gutter correction.
+   The top inset optically aligns the note heading with the first sidebar row;
+   it is not a measure of the ink at the end of the body text.
+   A real 30px scrollable bottom inset leaves approximately 35px between the
+   visible final text line and the editor's lower border, including during
+   native caret autoscrolling and in wrapped or multi-paragraph documents.
+   Keep the top inset and the editor geometry untouched. */
+.editor-scroll, .window.small-note-title .editor-scroll { padding-bottom:var(--editor-bottom-padding,30px); scroll-padding-bottom:var(--editor-bottom-padding,30px); }
+
+
+/* Nocturne Notes 1.2.8 — one-line note names without ellipsis or wrapping.
+   Long text is silently clipped at the button edge. Keep previous one-line height. */
+.note-list .note-row {
+  flex: 0 0 auto;
+  height: auto;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: clip;
+}
+.note-list .note-row-label {
+  display: block;
+  min-width: 0;
+  width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: clip;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+
+/* Nocturne Notes 1.2.9 — small, isolated settings refinements. */
+.glass-select-list button + button { margin-top:2px; }
+.dialog-backdrop.settings-open .dialog-buttons button {
+  height:36px;
+  min-height:36px;
+  box-sizing:border-box;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  line-height:16px;
+  padding:0 15px;
+}
+
+
+/* Nocturne Notes 1.2.10: one consistent control height in settings and dialogs.
+   Other controls (titlebar, sidebar, floating formatting) retain their
+   approved geometries. */
+.dialog-buttons button,
+.dialog-backdrop.settings-open .dialog-buttons button {
+  height:35px;
+  min-height:35px;
+  box-sizing:border-box;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  padding:0 15px;
+  line-height:1;
+}
+.font-step { height:35px; width:35px; padding:0; }
+.glass-select-trigger { height:35px; min-height:35px; box-sizing:border-box; padding-top:0; padding-bottom:0; }
+
+/* Nocturne Notes 1.2.11: project name in the existing title bar. */
+.app-title{display:flex;align-items:baseline;gap:6px;min-width:0;flex:0 1 auto;position:relative;z-index:1;white-space:nowrap}
+.app-title .app-name{flex-shrink:0}
+.project-caption{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:15px;font-weight:400;letter-spacing:-.02em;color:#b4b4b8}
+@media(max-width:720px){.project-caption{font-size:13px}}
+
+
+/* Nocturne Notes — agreed refinements. Existing visual tokens remain untouched. */
+/* Active-note status is pinned to the row's right edge, never inside the title. */
+.note-list .note-row{display:flex;align-items:center;min-width:0;gap:7px;}
+.note-list .note-row-label{flex:1 1 auto;width:auto;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:clip;}
+.note-save-dot{display:block;flex:0 0 6px;width:6px;height:6px;border-radius:50%;margin-left:auto;background:#49c779;pointer-events:auto;}
+.note-save-dot[data-status="pending"]{background:#e5b65a;}
+.note-save-dot[data-status="error"]{background:#df7272;}
+/* Existing row right inset is 13px, so the dot remains at a stable edge position. */
+.heading-popover{width:210px;max-width:calc(100% - 24px);padding:9px;}
+.heading-option{min-height:32px;padding:5px 8px;gap:8px;border-radius:8px;}
+.heading-option + .heading-option{margin-top:2px;}
+.heading-sample{width:37px;flex:0 0 37px;}
+/* Keep all dialog buttons (including Add link) at the previously agreed height. */
+.dialog-buttons button{height:35px;min-height:35px;max-height:35px;}
+/* The settings panel is taller with three new options; allow scrolling on short viewports. */
+.dialog-backdrop.settings-open .glass-dialog{max-height:calc(100dvh - 40px);overflow-y:auto;overscroll-behavior:contain;}
+.dialog-backdrop.settings-open .dialog-options{overflow:visible;}
+@media(max-width:800px){.floating-toolbar{max-width:calc(100% - 24px);}}
+/* Extra settings rows must scroll INSIDE the window, not beyond its rounded rim. */
+.dialog-backdrop.settings-open .glass-dialog{max-height:calc(100% - 24px);}
+
+/* Nocturne Notes: two symmetrical controls in the existing footer. */
+.sidebar-footer{gap:8px;}
+.sidebar-footer .add-note,.sidebar-footer .search-note{
+ width:36px;height:36px;min-width:36px;min-height:36px;
+ display:grid;place-items:center;padding:0;
+}
+.sidebar-footer .search-note svg{width:17px;height:17px;stroke-width:1.75;}
+.sidebar-search{flex:0 0 auto;display:flex;flex-direction:column;gap:7px;
+ padding:13px 12px 9px;border-bottom:1px solid #ffffff13;min-width:0;}
+.sidebar-search input{min-width:0;width:100%;height:35px;padding:0 10px;border:1px solid #ffffff24;
+ background:linear-gradient(140deg,#ffffff0e,#ffffff05);border-radius:10px;
+ color:#e5e5e7;outline:0;font-size:12px;}
+.sidebar-search input::placeholder{color:#88888e;}
+.sidebar-search input:focus{border-color:#ffffff5b;}
+.sidebar-search input[type=search]::-webkit-search-cancel-button{display:none;}
+.search-entry{display:flex;min-width:0;gap:5px;}
+.search-entry input{flex:1;}
+.search-entry button{flex:0 0 30px;width:30px;height:35px;padding:0;display:grid;place-items:center;
+ border:0;background:#ffffff0c;border-radius:9px;color:#bbb;}
+.search-entry button:hover{background:#ffffff1c;color:#fff;}
+.search-entry button svg{height:14px;width:14px;}
+.search-actions{display:flex;gap:7px;min-width:0;}
+.search-actions button{height:35px;min-width:0;flex:1;padding:0 6px;
+ font-size:11px;color:#d4d4d7;border:1px solid #ffffff20;border-radius:10px;
+ background:linear-gradient(140deg,#ffffff13,#ffffff08);}
+.search-actions button:hover{background:#ffffff25;}
+.search-actions button:disabled{opacity:.32;}
+.search-count{font-size:11px;line-height:16px;color:#88888e;margin:1px 2px 0;min-height:16px;}
+.sidebar.searching .note-list{padding-top:10px;}
+.search-empty{font-size:12px;color:#85858a;padding:12px 4px;}
+.dialog-backdrop.about-open .dialog-options{display:flex;justify-content:center;}
+.about-logo{display:block;height:76px;width:76px;object-fit:cover;border-radius:18px;margin:2px auto 8px;}
+
+
+/* Nocturne Notes: approved About identity and two-scope search controls. */
+.sidebar-search{gap:8px;padding-top:12px;}
+.search-heading{display:flex;align-items:center;justify-content:space-between;gap:9px;min-height:26px;margin-bottom:3px;}
+.search-heading>span{font:450 12px/1.3 "Segoe UI Variable Text","Segoe UI",sans-serif;color:#c6c6c9;white-space:nowrap;}
+.search-heading button{flex:0 0 26px;width:26px;height:26px;display:grid;place-items:center;padding:0;border:0;border-radius:8px;background:#ffffff0c;color:#bdbdc0;}
+.search-heading button:hover{background:#ffffff1c;color:white;}
+.search-heading button svg{height:13px;width:13px;}
+.sidebar-search>#search-query,.sidebar-search>#search-replacement{display:block;width:100%;min-width:0;height:35px;min-height:35px;box-sizing:border-box;padding:0 10px;}
+.search-scope{display:flex;gap:2px;min-height:32px;padding:3px;border:1px solid #ffffff1f;border-radius:10px;background:#ffffff08;}
+.search-scope button{flex:1 1 0;min-width:0;height:26px;padding:0 2px;border:0;border-radius:7px;background:transparent;color:#9d9da2;font-size:11px;white-space:nowrap;}
+.search-scope button.selected{background:#ffffff1d;color:#f3f3f4;box-shadow:inset 0 1px 0 #ffffff0b;}
+.search-scope button:hover:not(.selected){background:#ffffff0e;color:#ddd;}
+.search-actions button{white-space:nowrap;font-size:11px;}
+.dialog-backdrop.about-open .glass-dialog{width:min(342px,calc(100% - 30px));}
+.dialog-backdrop.about-open #dialog-heading{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;}
+.dialog-backdrop.about-open #dialog-message{display:none;}
+.dialog-backdrop.about-open #dialog-options{display:flex;align-items:center;justify-content:center;margin:8px 0 19px;}
+.about-identity{width:max-content;max-width:100%;display:flex;align-items:center;justify-content:center;gap:15px;margin:0 auto;}
+.about-logo{display:block;flex:0 0 70px;width:70px;height:70px;object-fit:contain;border:0;border-radius:0;margin:0;}
+.about-details{display:flex;flex-direction:column;gap:7px;min-width:0;}
+.about-product{font-size:16px;line-height:1.2;font-weight:590;white-space:nowrap;color:#ededee;}
+.about-version{font-size:12px;line-height:1.3;color:#aaaab0;white-space:nowrap;}
+
+/* 1.4.2: non-invasive search navigation and third matching footer button. */
+.sidebar-footer .save-note{width:36px;height:36px;min-width:36px;min-height:36px;display:grid;place-items:center;padding:0;}
+.sidebar-footer .save-note svg{width:17px;height:17px;stroke-width:1.7;}
+.search-navigation{display:flex;align-items:center;justify-content:space-between;min-height:22px;gap:7px;padding:0 1px;}
+.search-counter{font-size:11px;color:#aaaab0;line-height:20px;font-variant-numeric:tabular-nums;}
+.search-navigation-buttons{display:flex;align-items:center;gap:5px;}
+.search-navigation-buttons button{display:grid;place-items:center;width:24px;height:23px;padding:0;border:1px solid #ffffff18;background:#ffffff0b;border-radius:7px;color:#d7d7da;}
+.search-navigation-buttons button:hover:not(:disabled){background:#ffffff24;}
+.search-navigation-buttons button svg{width:13px;height:13px;stroke-width:1.7;}
+::highlight(nocturne-search-all){background:rgba(149,122,186,.34);color:inherit;}
+::highlight(nocturne-search-current){background:rgba(168,128,208,.78);color:#fff;}
+.note-title.search-title-hit{box-shadow:inset 0 -1px 0 rgba(159,130,189,.38);}
+.dialog-backdrop.about-open .about-identity{display:grid;grid-template-columns:70px max-content;align-items:center;justify-content:center;column-gap:15px;width:100%;margin:0 auto;}
+/* The collapsed-to-minimum 120px sidebar still accommodates three 36px controls. */
+.sidebar{container-type:inline-size;}
+@container (max-width:170px){.sidebar-footer{margin-left:2px;margin-right:2px;gap:3px;}}
+/* A title match uses the native text-selection rendering when navigated to;
+   avoid drawing a full-width underline for a substring result. */
+.note-title.search-title-hit{box-shadow:none;}
+
+/* Optical balance of the logo and text as a single centered group. */
+.dialog-backdrop.about-open .about-identity{transform:translateX(-3px);}

@@ -1,0 +1,9 @@
+node_modules/
+dist/
+*.log
+*.tmp
+coverage/
+.DS_Store
+
+/assets/nocturne-notes-refined.ico
+/assets/nocturne-start-menu.ico

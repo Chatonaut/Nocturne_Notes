@@ -1,0 +1,103 @@
+{
+  "name": "nocturne-notes",
+  "productName": "Nocturne Notes",
+  "version": "2.0.0",
+  "description": "Minimal dark glass note editor for Windows 11",
+  "main": "main.js",
+  "author": "Nocturne Notes",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test tests/*.test.js",
+    "build:win": "electron-builder --win --x64 --publish never",
+    "verify:visual": "node scripts/verify-ui-lock.js",
+    "test:ui": "electron scripts/test-desktop-ui.js",
+    "bench:compare": "node scripts/compare-performance.js"
+  },
+  "devDependencies": {
+    "electron": "45.4.1",
+    "electron-builder": "26.18.0"
+  },
+  "build": {
+    "appId": "com.nocturnenotes.desktop",
+    "productName": "Nocturne Notes",
+    "asar": true,
+    "files": [
+      "index.html",
+      "styles.css",
+      "brand.css",
+      "renderer.js",
+      "search.js",
+      "assets/nocturne-brand-mark.png",
+      "assets/nocturne-notes-logo.png",
+      "windows-shell.css",
+      "preview-api.js",
+      "recovery.js",
+      "window-shape.js",
+      "corner-resize.js",
+      "main.js",
+      "preload.js",
+      "storage.js",
+      "package.json",
+      "undo-buffer.js",
+      "features.css",
+      "settings.js",
+      "i18n.js"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "Nocturne Notes.exe",
+      "icon": "assets/nocturne-notes-refined.ico",
+      "signAndEditExecutable": true
+    },
+    "fileAssociations": [
+      {
+        "ext": "ns",
+        "name": "Nocturne Notes Project",
+        "description": "Nocturne Notes project",
+        "role": "Editor"
+      }
+    ],
+    "nsis": {
+      "artifactName": "Nocturne Notes Setup ${version}.exe",
+      "oneClick": false,
+      "perMachine": false,
+      "allowElevation": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "allowToChangeInstallationDirectory": true,
+      "installerLanguages": [
+        "en_US",
+        "ru_RU"
+      ],
+      "installerIcon": "assets/nocturne-notes-refined.ico",
+      "uninstallerIcon": "assets/nocturne-notes-refined.ico",
+      "include": "build/installer.nsh",
+      "deleteAppDataOnUninstall": false
+    },
+    "electronLanguages": [
+      "en-US",
+      "ru"
+    ],
+    "portable": {
+      "artifactName": "Nocturne Notes Portable.exe",
+      "requestExecutionLevel": "user"
+    }
+  }
+}

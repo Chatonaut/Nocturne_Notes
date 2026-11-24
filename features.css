@@ -1,0 +1,84 @@
+/* Approved 1.6.x additions; frozen base UI and native geometry unchanged. */
+.window .note-title, body.is-electron .window .note-title {
+ font-size:var(--note-title-size,20px)!important;
+ line-height:var(--note-title-line,30px)!important;
+ height:var(--note-title-line,30px)!important;
+}
+.edit-history {display:flex;align-items:center;height:34px;border-radius:30px;background:linear-gradient(150deg,#ffffff0e,#ffffff06);border:1px solid #ffffff0b;box-shadow:inset 0 1px 0 #ffffff10,0 2px 11px #0007;overflow:hidden;flex:none;-webkit-app-region:no-drag;}
+.edit-history button {display:grid;place-items:center;width:34px;height:32px;padding:0;background:transparent;border:0;color:#d9d9dd;}
+.edit-history button + button {border-left:1px solid #ffffff0e;}
+.edit-history button:disabled {opacity:.30;cursor:default;}
+.edit-history button:not(:disabled):hover {background:#ffffff14;}
+.edit-history svg {width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;}
+.window.focus-mode .titlebar,.window.focus-mode .sidebar {display:none!important;}
+.window.focus-mode .editor-outer {padding:10px!important;}
+#app-menu {max-height:calc(100% - 65px);overflow-y:auto;}
+.dialog-backdrop.trash-open .glass-dialog {width:min(440px,calc(100% - 30px));max-height:calc(100% - 24px);overflow:auto;}
+.dialog-backdrop.trash-open .glass-dialog:not(:has(#trash-list)) {width:min(400px,calc(100% - 30px));}
+#trash-list {display:flex;flex-direction:column;gap:9px;}
+.trash-row {display:flex;align-items:center;gap:7px;padding:8px;border:1px solid #ffffff12;border-radius:10px;}
+.trash-copy {display:flex;flex-direction:column;min-width:0;flex:1;gap:3px;}
+.trash-copy strong {font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500;}
+.trash-copy small {color:#999;font-size:11px;}
+#trash-list button {border:1px solid #ffffff24;background:#ffffff09;border-radius:8px;color:#ddd;padding:7px;font-size:12px;flex:none;}
+#trash-list button:hover {background:#ffffff19;}
+#trash-list > button {align-self:start;}
+
+/* The decorative wave crosses interactive controls; keep the frozen original as reference only. */
+.titlebar .glass-wave {display:none;}
+/* Preserve the accepted 34px history group. Center the new independent controls
+   on the same flex axis, with 16px clear space before the system controls. */
+.quick-window-actions {display:flex;align-items:center;gap:8px;flex:0 0 auto;-webkit-app-region:no-drag;}
+.quick-window-actions button {width:38px;height:38px;min-width:38px;min-height:38px;padding:0;display:grid;place-items:center;}
+.quick-window-actions svg {width:18px;height:18px;display:block;stroke-width:1.6;}
+.quick-window-actions button {color:#d5d5da;}
+/* Identical neutral color/stroke; the pin has more ink, so balance its optical weight. */
+.quick-window-actions #always-top svg {width:17px;height:17px;stroke-width:1.6;}
+.quick-window-actions button[aria-pressed="true"] {background:#ffffff29;border-color:#ffffff50;color:#fff;}
+/* Fixed left slot: preserve the app/caption start and reserve the history
+   position regardless of project name. Only the caption clips, without ellipsis. */
+.window .titlebar .app-title {flex:0 0 240px;width:240px;max-width:240px;}
+.window .titlebar .project-caption {flex:1 1 0;min-width:0;text-overflow:clip;-webkit-app-region:no-drag;cursor:default;}
+/* At minimum desktop width the blank drag area may start 14px earlier; the
+   visible controls, their 16px separation and history position do not change. */
+@media(max-width:790px) {
+ .window .titlebar .drag-space {margin-left:-14px;}
+}
+@media(max-width:720px) {
+ .window .titlebar .app-title {flex:0 1 240px;width:auto;}
+ .window .titlebar .drag-space {margin-left:0;}
+}
+/* The existing titlebar has a 16px flex gap. Do not add margin to the quick group. */
+.window .titlebar .drag-space {min-width:24px;}
+.window .titlebar .window-controls {flex-shrink:0;}
+/* Global editor font preference, never change the rest of the interface. */
+.window .note-title,.window .editor {font-family:var(--editor-font-family,"Segoe UI Variable Text","Segoe UI",Inter,Arial,sans-serif);}
+/* Settings: two aligned columns inside each row, not two disparate panels. */
+.dialog-backdrop.settings-open .glass-dialog {width:min(600px,calc(100% - 26px));max-height:calc(100% - 24px);padding:20px;overflow-y:auto;}
+.dialog-backdrop.settings-open .glass-dialog h2 {margin:0 0 10px;}
+.dialog-backdrop.settings-open .settings-group {padding:4px 0 0;}
+.dialog-backdrop.settings-open .settings-group + .settings-group {margin-top:8px;padding-top:8px;}
+.dialog-backdrop.settings-open .settings-caption {margin-bottom:5px;}
+.dialog-backdrop.settings-open .setting-row {min-height:45px;padding:3px 0;gap:16px;}
+.dialog-backdrop.settings-open .setting-copy {flex:1 1 0;gap:3px;}
+.dialog-backdrop.settings-open .editor-font-setting .glass-select {width:185px;flex-basis:185px;}
+.dialog-backdrop.settings-open .editor-font-setting .glass-select-list {max-height:none;overflow:visible;}
+.dialog-backdrop.settings-open .editor-font-setting .glass-select-list button {padding:7px 9px;}
+.dialog-backdrop.settings-open .font-setting {display:flex;align-items:center;}
+.dialog-backdrop.settings-open .font-setting .font-controls {margin:0;flex:0 0 52%;min-width:0;gap:8px;}
+.dialog-backdrop.settings-open .font-controls input[type="range"] {min-width:45px;}
+.dialog-backdrop.settings-open .font-readout {min-width:40px;}
+.dialog-backdrop.settings-open .dialog-buttons {margin-top:12px;}
+/* On short windows retain breathing room; scroll the dialog only if needed. */
+@media(max-height:580px) {
+ .dialog-backdrop.settings-open .glass-dialog {padding:14px 20px;}
+ .dialog-backdrop.settings-open .glass-dialog h2 {margin-bottom:6px;}
+ .dialog-backdrop.settings-open .setting-row {min-height:40px;padding:1px 0;}
+ .dialog-backdrop.settings-open .setting-copy {gap:2px;}
+ .dialog-backdrop.settings-open .settings-group + .settings-group {margin-top:5px;padding-top:5px;}
+ .dialog-backdrop.settings-open .dialog-buttons {margin-top:8px;}
+}
+@media(max-width:540px) {
+ .dialog-backdrop.settings-open .font-setting {display:block;}
+ .dialog-backdrop.settings-open .font-setting .font-controls {margin-top:6px;}
+}

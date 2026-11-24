@@ -1,0 +1,145 @@
+/* Electron-only shell. The accepted editor stylesheet styles.css remains unchanged. */
+/* The web canvas must never cover transparent corners of the native frameless window. */
+html:has(body.is-electron), body.is-electron { background: transparent !important; }
+body.is-electron .desktop {
+  padding: 0 !important; background: transparent !important;
+  height: 100dvh !important; width: 100vw !important;
+  align-items: stretch !important; justify-content: stretch !important;
+}
+/* Match the visible rounded shell to the full native window. No surrounding black panel. */
+body.is-electron .window {
+  width: 100% !important; height: 100% !important;
+  max-width: none !important; max-height: none !important;
+  min-width: 0 !important; min-height: 0 !important;
+}
+/* Full-screen windows keep the same editor while dropping only outer corner rounding. */
+body.is-electron .window.is-maximized { border-radius: 0 !important; }
+
+/* 1.5.4: center the three 36px controls against the FULL sidebar width.
+   The former grid inherited 19px side margins and additional responsive rules,
+   which shifted/overflowed the visual group. No approved base CSS changes. */
+body.is-electron .sidebar-footer {
+  width: 100%;
+  margin: 0 !important;
+  /* Whole CSS-pixel positions prevent alternating raster phase as the sidebar
+     is dragged through odd/even widths. Center within half a CSS pixel. */
+  --footer-gap: round(nearest, clamp(3px, calc(50cqw - 57px), 8px), 1px);
+  padding: 0;
+  padding-left: round(nearest, max(0px, calc(50% - 54px - var(--footer-gap))), 1px);
+  border-top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--footer-gap);
+}
+body.is-electron .sidebar-footer::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 20px;
+  right: 19px;
+  height: 1px;
+  background: #ffffff16;
+  pointer-events: none;
+}
+body.is-electron .sidebar-footer > button {
+  box-sizing: border-box;
+  flex: 0 0 36px;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  min-height: 36px;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  position: relative;
+}
+/* Center symmetric glyphs exactly. The search symbol has asymmetric bounds:
+   its visible geometry spans 4.3..21 in both axes of a 24-unit viewBox.
+   At 17px, its bounds center is offset by 0.46px; compensate this glyph only. */
+body.is-electron .sidebar-footer > button > svg {
+  display: block;
+  position: absolute;
+  inset: auto;
+  left: 50%;
+  top: 50%;
+  margin: 0;
+  transform: none;
+  translate: -50% -50%;
+  pointer-events: none;
+}
+body.is-electron .sidebar-footer > #search-toggle > svg {
+  translate: calc(-50% - .46px) calc(-50% - .46px);
+}
+@container (max-width:170px) {
+  body.is-electron .sidebar-footer::before { left: 2px; right: 2px; }
+}
+/* Inner-corner resize targets: never paint beyond the native rounded region.
+   The approved 29px silhouette is unchanged and no black corner mask is used. */
+body.is-electron .nocturne-native-corner-grip {
+  position:fixed;
+  z-index:999999;
+  background:transparent;
+  border:0;
+  padding:0;
+  pointer-events:auto;
+  touch-action:none;
+  user-select:none;
+  -webkit-app-region:no-drag;
+}
+body.is-electron .corner-nw { top:0; left:0; width:18px; height:28px; cursor:nwse-resize; }
+body.is-electron .corner-ne { top:0; right:0; width:12px; height:28px; cursor:nesw-resize; }
+body.is-electron .corner-sw { bottom:0; left:0; width:25px; height:25px; cursor:nesw-resize; }
+body.is-electron .corner-se { bottom:0; right:0; width:25px; height:25px; cursor:nwse-resize; }
+body.is-electron:has(.window.is-maximized) .nocturne-native-corner-grip { display:none; }
+
+/* 1.5.5 desktop typography: the approved preview remains immutable.
+   Match its normal-size desktop appearance, independent of viewport width.
+   Keep the user's body font size and line-height settings authoritative. */
+body.is-electron { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+body.is-electron .note-list { padding-left: 20px; padding-right: 19px; }
+body.is-electron .note-list .note-row {
+  font-size: 15px;
+  min-height: 36px;
+  padding-left: 12px;
+  padding-right: 12px;
+}
+body.is-electron .note-title {
+  font-size: 24px;
+  line-height: 30px;
+  height: 30px;
+  margin-bottom: 10px;
+}
+body.is-electron .window.small-note-title .note-title {
+  font-size: 20px;
+  line-height: 30px;
+  height: 30px;
+}
+body.is-electron .editor-scroll,
+body.is-electron .window.small-note-title .editor-scroll {
+  padding-top: 19px;
+}
+body.is-electron .editor { font-size: var(--font-size, 17px); }
+body.is-electron .app-name,
+body.is-electron .project-caption { font-size: 15px; }
+
+/* Alpha experiment: one transparent surface; keep the approved outer radius.
+   All eight directions are accessible without a Win32 thick frame. */
+body.is-electron[data-corner-mode="alpha"] .corner-nw,
+body.is-electron[data-corner-mode="alpha"] .corner-ne,
+body.is-electron[data-corner-mode="alpha"] .corner-sw,
+body.is-electron[data-corner-mode="alpha"] .corner-se { width:24px; height:24px; }
+body.is-electron[data-corner-mode="alpha"] .corner-n { top:0; left:24px; right:24px; height:5px; cursor:ns-resize; }
+body.is-electron[data-corner-mode="alpha"] .corner-s { bottom:0; left:24px; right:24px; height:5px; cursor:ns-resize; }
+body.is-electron[data-corner-mode="alpha"] .corner-w { left:0; top:24px; bottom:24px; width:5px; cursor:ew-resize; }
+body.is-electron[data-corner-mode="alpha"] .corner-e { right:0; top:24px; bottom:24px; width:5px; cursor:ew-resize; }
+/* Diagnostic only: DWM supplies the outer curve instead of two radii. */
+body.is-electron[data-corner-mode="native"] .window { border-radius:0 !important; }
+
+/* The approved browser preview has external shadows intended for a larger
+   canvas. In an alpha window they fill the otherwise transparent corners.
+   Retain the original inset rim and rely on the system for external shadow. */
+body.is-electron[data-corner-mode="alpha"] .window {
+  box-shadow:inset 0 0 0 1px #ffffff09,inset 0 1px 0 #ffffff1a;
+}
