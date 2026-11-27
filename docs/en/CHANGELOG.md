@@ -1,5 +1,5 @@
 # Changelog
-## 2.5.0 — changes since 2.0.0
+## 2.5.0 — 27 November 2026
 - Optional SQLCipher password protection for the full project, including recovery/trash; set, change, remove, lock and unlock. Three-state titlebar lock and Ctrl+Shift+L with immediate privacy mask, retry/cancel on save failure.
 - Managed temporary drafts with Save/Don't save/Cancel, recovery of interrupted active draft independent of restore setting, safe cleanup.
 - Pinned notes in fixed top group, protected from move/delete, unpinned copies/restores; adaptive context menu.
@@ -11,4 +11,3 @@
 ## 2.0.0 — 24 November 2026
 First public stable release: NSIS/Portable, separate Start Menu shortcut icon and stable Portable profile, English/Russian, optional tray, local SQLite notes, rich text, search/replace, recovery, trash, bounded undo, focus and always-on-top.
 
-Historical private development records are not additional public versions. Check actual GitHub Releases for publication state.

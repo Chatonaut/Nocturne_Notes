@@ -67,7 +67,7 @@ Portable не хранит весь профиль рядом с EXE. Прове
 |---|---|
 | ![Настройки](https://github.com/Chatonaut/Nocturne_Notes/releases/download/v2.5.0/Nocturne-Notes-Settings.png) | ![Установка пароля](https://github.com/Chatonaut/Nocturne_Notes/releases/download/v2.5.0/Nocturne-Notes-Protection.png) |
 
-[Заблокированный проект](https://github.com/Chatonaut/Nocturne_Notes/releases/download/v2.5.0/Nocturne-Notes-Locked.png). На скриншотах показано приложение с демонстрационными заметками. Файлы и скриншоты 2.5.0 публикуются вместе с [релизом 2.5.0](https://github.com/Chatonaut/Nocturne_Notes/releases/tag/v2.5.0).
+[Заблокированный проект](https://github.com/Chatonaut/Nocturne_Notes/releases/download/v2.5.0/Nocturne-Notes-Locked.png). На скриншотах показано приложение с демонстрационными заметками. Файлы и скриншоты 2.5.0 доступны вместе с [релизом 2.5.0](https://github.com/Chatonaut/Nocturne_Notes/releases/tag/v2.5.0).
 
 ## Ваши данные
 

@@ -67,7 +67,7 @@ Version 2.5 introduces project protection, temporary drafts and pinned notes, al
 |---|---|
 | ![Settings](https://github.com/Chatonaut/Nocturne_Notes/releases/download/v2.5.0/Nocturne-Notes-Settings.png) | ![Password setup](https://github.com/Chatonaut/Nocturne_Notes/releases/download/v2.5.0/Nocturne-Notes-Protection.png) |
 
-[Locked project](https://github.com/Chatonaut/Nocturne_Notes/releases/download/v2.5.0/Nocturne-Notes-Locked.png). Screenshots show the application with sample notes. The 2.5.0 files and screenshots are supplied with the [2.5.0 release](https://github.com/Chatonaut/Nocturne_Notes/releases/tag/v2.5.0).
+[Locked project](https://github.com/Chatonaut/Nocturne_Notes/releases/download/v2.5.0/Nocturne-Notes-Locked.png). Screenshots show the application with sample notes. The 2.5.0 files and screenshots are available in the [2.5.0 release](https://github.com/Chatonaut/Nocturne_Notes/releases/tag/v2.5.0).
 
 ## Your data
 

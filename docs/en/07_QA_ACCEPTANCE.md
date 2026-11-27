@@ -15,3 +15,6 @@ Run on synthetic, isolated projects/profiles only. Do not equate browser preview
 | Network | Default session without observed application HTTP/WebSocket requests; optional spelling and OS paths are separate |
 
 The accepted final validation included 86/86 unit tests, 60 alternating comparative project-load sessions and all mandatory CI gates. Separate optional extended tests remain available via benchmark scripts. Coverage applies only to instrumented files, not entire C++/Electron/UI. Record actual evidence, not assumed outcomes. Manual checks at available DPI/wallpapers, real hardware and both editions remain important. Never weaken a failed assertion merely to obtain a green build. See [risks](10_RISKS_AND_DECISIONS.md).
+
+## Public release result
+[Build #2](https://github.com/Chatonaut/Nocturne_Notes/actions/runs/45959605628) — SUCCESS; required gates, publication, 86 unit tests and checksums. Coverage of instrumented files: 99% lines, 85.23% branches, 98.15% functions. Four screenshots visually reviewed. [Release evidence](https://github.com/Chatonaut/Nocturne_Notes/releases/download/v2.5.0/Stable-build-evidence.zip). Extended load testing was not repeated.
