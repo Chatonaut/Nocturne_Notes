@@ -3,3 +3,5 @@ Preserve the accepted UI, project format, pinned runtime and artwork. Scope chan
 
 ## Release status
 [2.5.0](https://github.com/Chatonaut/Nocturne_Notes/releases/tag/v2.5.0) published on 27 November 2026. [Public CI #2](https://github.com/Chatonaut/Nocturne_Notes/actions/runs/45959605628) succeeded; both editions, all nine release assets and evidence were verified. Build source commit: `725c9d469c5bbb90e261cfdf310243a3156d2a6e`. README was refined separately without a new build. Releases 2.0.0 and 2.5.0 and runs #1 and #2 are retained.
+
+Distribution SHA-256 (public build #2): Setup `0d816834bda9987c871b264c8502201a555d3993b08f3a840bb8c18717df17c7`; Portable `62495390d856a0a5627362c40414bf0cf509c540af56ae526894ce7b2f3a4495`. About and topics are configured. Social preview replacement is an administrative task, not a runtime change. See [handover](09_NEW_CHAT_PROMPT.md).
