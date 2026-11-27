@@ -2,7 +2,7 @@
 
 <h1 align="center">Nocturne Notes</h1>
 <p align="center"><strong>Минималистичный редактор заметок</strong></p>
-<p align="center">Тихое пространство для ваших мыслей.</p>
+<p align="center">Тихое пространство для ваших мыслей</p>
 <p align="center">Windows 11 x64 · Открытый исходный код</p>
 
 <p align="center">
