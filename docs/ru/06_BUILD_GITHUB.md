@@ -1,21 +1,13 @@
-# Сборка и упаковка
+# Сборка Windows и распространение — 2.5.0
+Авторитетный рецепт: [.github/workflows/windows.yml](../../.github/workflows/windows.yml). Использовать одноразовый Windows x64 runner; не выполнять тесты установщика/очистки профиля на компьютере с реальными заметками. Node.js 22, Python Pillow 11.3.0 и pefile 2024.8.26, закрепленные Electron 45.5.0 и electron-builder 26.18.0.
 
-Windows 11 x64 или Windows-раннер GitHub, Node.js 22, Python с Pillow 11.3.0 и pefile 2024.8.26. Фиксировать electron 45.4.1 и electron-builder 26.18.0.
+1. Проверить точную заморозку исходников/графики (`node scripts/verify-release-freeze.js`) и визуальный эталон (`npm run verify:visual`); `npm ci --no-audit --no-fund` без изменения package-lock.json.
+2. Инициализировать Electron (`npx --no-install electron --version`), найти реальный EXE и npm CLI через `require.resolve('electron/cli.js')`; проверять настоящий код завершения. ELECTRON_RUN_AS_NODE только в специально выделенных неупакованных диагностических шагах; не включать RunAsNode в упаковке.
+3. Lint, типы, ранние тесты текущего формата/хранения/IPC, полный и production npm audit, инвентаризация зависимостей.
+4. Получить SQLCipher Community коммит 355d4db92d3404e71faa8088d071a71d767807f4, vcpkg коммит 9290f1a2049af5fdd6d580efbb765baaa85a3623; собрать закрепленные SQLCipher/OpenSSL через `scripts/build-sqlcipher.ps1`. Нативный аудит до компиляции; проверить реальную среду, версии и область упаковки, сформировать SBOM. Действия закреплены по SHA. Кешировать только инструменты/загрузки и vcpkg-архивы с ключами runner/toolset/port/triplet/lock, не бинарники приложения.
+5. Полное покрытие модульных тестов, реальный UI, защита, надежность, браузерный просмотр, боковая панель, черновики, второй экземпляр и offline. Согласованный рецепт стабильного выпуска исключает нагрузочные и сравнительные замеры; сохранить сценарии для отдельной целевой проверки.
+6. Создать утвержденную иконку `python scripts/prepare-windows-icon.py`; `npm run build:win`; проверить упакованные файлы, fuses, нативный SQLCipher в реальных защищенных EXE, точные локали en-US.pak/ru.pak, описание Minimalist note editor, версию 2.5.0 и встроенные иконки.
+7. Один реальный тест первого кадра Portable с именованным синтетическим проектом и `scripts/test-installer.ps1`: установка для пользователя, ярлыки, ассоциация, нативная среда, первый кадр, удаление без потери данных. Сохранять диагностику сбоя.
+8. Сформировать и проверить SHA256SUMS.txt именно полученных EXE. Сохранить отчеты и SBOM. Публиковать только проверенные файлы с разрешения владельца. Независимые сборки могут отличаться побайтно; не использовать хеши другой сборки.
 
-```powershell
-npm run verify:visual
-npm ci --no-audit --no-fund
-npm test
-npm run test:ui
-python -m pip install Pillow==11.3.0 pefile==2024.8.26
-python scripts/prepare-windows-icon.py
-npm run build:win
-node scripts/verify-package.js
-python scripts/verify-exe-icons.py assets/nocturne-notes-refined.ico 'dist/win-unpacked/Nocturne Notes.exe' 'dist/Nocturne Notes Portable.exe' 'dist/Nocturne Notes Setup 2.0.0.exe'
-./scripts/test-installer.ps1
-Get-FileHash -Algorithm SHA256 'dist/Nocturne Notes Portable.exe','dist/Nocturne Notes Setup 2.0.0.exe'
-```
-
-Тест установки изменяет ярлыки и профиль одноразового раннера: не запускать на рабочем компьютере с реальными заметками. Выходной каталог dist. EXE: Nocturne Notes Setup 2.0.0.exe и Nocturne Notes Portable.exe; контрольные суммы SHA256SUMS.txt. Явный список ASAR, два реальных языковых пакета en-US.pak и ru.pak; NSIS английский/русский. Цифровая подпись не настроена. Установка для пользователя, пошаговая, выбор каталога, ярлыки рабочего стола/«Пуск», регистрация .ns; удаление сохраняет данные. Обычный ICO неизменен, макрос NSIS меняет только «Пуск».
-
-Публичный workflow собирает и тестирует снимок, публикует файлы GitHub Release с SHA-256. Приватная приемка включала три чередующихся прогона бенчмарка против 1.8.0; историческое сравнение требует отдельного checkout базовой версии и не повторяется из отсутствующей публичной истории. Результаты разных сборок могут побайтово отличаться; сверять SHA256SUMS именно скачанного релиза.
+Результаты: `dist/Nocturne Notes Setup.exe`, `dist/Nocturne Notes Portable.exe`, `dist/SHA256SUMS.txt`. Пошаговая установка для пользователя, выбор пути, ярлыки, ассоциация .ns; без повышения прав, без удаления данных. NSIS EN/RU. Сертификата подписи нет. SHA-256 проверяет целостность, а не издателя. Для CVE-2026-119586 имеется условное проверенное заключение только о CLI; не ослаблять остальные ошибки аудита или недоступность результатов. См. [контроль качества](07_QA_ACCEPTANCE.md).

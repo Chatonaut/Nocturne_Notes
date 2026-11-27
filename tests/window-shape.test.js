@@ -42,7 +42,10 @@ test('visible draft name never exposes UUID and save-as uses friendly default',(
   assert.equal(text(lang,'Новый проект'),name);
   assert.equal(text(lang,'Новый проект.ns'),name+'.ns');
  }
- assert.match(source,/const file=path\.join\(app\.getPath\('userData'\),'drafts',`draft-/);
+ // The private directory is now a shared lifecycle helper, not an inline path.
+ assert.match(source,/const draftDirectory=\(\)=>path\.join\(app\.getPath\('userData'\),'drafts'\);/);
+ assert.match(source,/const file=path\.join\(draftDirectory\(\),`draft-\$\{crypto\.randomUUID\(\)\}\.ns`\);/);
+ assert.match(source,/function isDraftPath\(filePath\)\{return isManagedDraft\(draftDirectory\(\),filePath\);\}/);
 });
 test('approved N remains small, centered and unmodified',()=>{
  const fs=require('node:fs'),crypto=require('node:crypto'),path=require('node:path');

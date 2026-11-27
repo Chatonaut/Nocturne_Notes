@@ -1,11 +1,8 @@
-# Approved refinements
-
-The final decisions supersede obsolete intermediate designs:
-- Stable 2.0.0; installer filename includes version, Portable filename does not.
-- English by default, Russian complete application localization; no translation of user content. Language belongs to the final Application section.
-- Editor caption is restored to original top position; no extra 12 px margin. Existing spacing, width, slider steps and switches remain.
-- Optional tray uses the original Nocturne Notes logo and native localized menu Open Nocturne Notes / Exit. No autostart. Close saves and hides only if enabled; normal minimize unchanged.
-- Standard logo ICO unchanged, separate larger Start Menu shortcut icon only; original assets retained.
-- Session history 50 steps/64 MiB, duplication, project trash, focus and always-on-top implemented. No other planned features included.
-- Diskette icon remains exactly as accepted; keep footer optical centers. No changes to startup solely for aesthetics or diagnostic timing.
-- Public README and documentation English first with equally complete Russian alternatives; private history remains private.
+# Approved refinements — final 2.5.0
+- Exact accepted interface, original artwork and diskette; preserve shell shape, eight resize zones and optical positions. Password submenu text-only, note context adaptive, F2 functional but not printed. Symmetric 1 px label clearance; app-owned dialog labels raised 1 px; locked heading glyph lowered 1 px; no forced description line breaks or final periods.
+- Fixed top pin group; append new pins; unpin first ordinary; pinned cannot move/delete until unpinned; copies/restore ordinary; divider 1 px only between visible groups.
+- Plain lock opens password setup; protected unlocked lock masks then flushes; locked lock challenges. Ctrl+Shift+L same including focus. Equal visual state, no automatic lock. Minimum password 8 Unicode code points.
+- Managed drafts Save/Discard/Cancel; cleanup only safely owned files, interrupted active recovered even with restore disabled. Tray hide is not exit. Whole-minute autosave 1–20, default 1; independent 450 ms recovery.
+- Preserve current .ns marker, no old compatibility/migration scope; atomic note creation, file-identity recovery, hard-link overwrite rejection, sanitized browser preview and preference rollback. No other functional changes.
+- Setup and Portable exact filenames without version; 2.5.0 metadata; description Minimalist note editor; independent permanent Portable profile and AUMID; no deletion of existing data. English default/Russian; optional tray off.
+- Stable builds retain functional, security and package checks, not repeated extended load/compare. Docs EN/RU equally current; private history private; real public screenshots and approved logo only.

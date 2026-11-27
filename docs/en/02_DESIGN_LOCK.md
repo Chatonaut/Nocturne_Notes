@@ -1,6 +1,6 @@
-# Design lock — approved 2.0.0
+# Design lock — approved 2.5.0
 
-The authoritative implementation is index.html, styles.css, brand.css, windows-shell.css, features.css, renderer.js and the original artwork in assets/. The historical frozen HTML reference is reference/Nocturne-Notes-Approved-Preview-1.5.html. Run npm run verify:visual. Its HTML exceptions are only the approved settings and i18n scripts; never normalize or refactor frozen styles for convenience.
+The authoritative implementation is index.html, styles.css, brand.css, windows-shell.css, features.css, renderer.js and the original artwork in assets/. The historical frozen HTML reference is reference/Nocturne-Notes-Approved-Preview-1.5.html. Run npm run verify:visual. Its HTML exceptions are the approved content-policy, settings and i18n scripts; never normalize or refactor frozen styles for convenience.
 
 - Near-black matte editor, compact glass chrome, subtle shadows and separators, rounded transparent Windows corners. Preserve all eight resize zones; minimum window 740×480 CSS px; native clipping/fallback logic remains intact. No extra panels, color themes, framework migration or redesign.
 - Top chrome: approved N mark, project caption clipped rather than ellipsized with full tooltip, fixed Undo/Redo group (70×34, x326 in reference geometry), focus and always-on-top controls, minimize/maximize/close. Close hover alone is red; no decorative wave.
@@ -11,3 +11,6 @@ The authoritative implementation is index.html, styles.css, brand.css, windows-s
 - Artwork: original source unchanged. Standard generated ICO visible fill measured 92.48%; separate Start Menu shortcut ICO 97.46%; desktop, app, taskbar, installer, uninstaller and footer icons unchanged.
 
 Any future visual changes require explicit approval and real Windows screenshots at comparable sizes and DPI. Do not claim universal pixel accuracy from a browser preview.
+
+## Final 2.5.0 additions
+The accepted password dialogs, text-only protection submenu, three-state titlebar lock, pinned-note prefix and 1 px divider, adaptive note context menu, draft warning, minute-based autosave and optical label corrections are part of the frozen design. The lock remains equally bright in plain, unlocked and locked states; the locked heading glyph has only the 1 px vertical correction. See [functional specification](03_FUNCTIONAL_SPEC.md) for precise behavior. Run the exact 34-blob release freeze and actual Electron UI checks; historical design reference and artwork must remain unchanged.

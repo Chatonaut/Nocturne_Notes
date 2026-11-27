@@ -6,7 +6,7 @@ const path = require('node:path');
 const root=path.join(__dirname,'..');
 const read=n=>fs.readFileSync(path.join(root,n),'utf8');
 
-test('alpha experiment removes opaque backing, retains shape diagnostic',()=>{
+test('native alpha window omits opaque backing and retains shape diagnostic',()=>{
  const main=read('main.js');
  assert.match(main,/transparent:!isWin\|\|alphaMode/);
  assert.match(main,/thickFrame:isWin&&!alphaMode/);
@@ -27,16 +27,22 @@ test('first frame waits for app boot and the shell stylesheet',()=>{
  assert.match(main,/ipcMain\.on\('app:renderer-ready'/);
  assert.doesNotMatch(main,/once\('ready-to-show',\(\)=>\{win\.show/);
 });
-test('Windows installer packages only two locales and required assets',()=>{
+test('Windows packaging retains two locales and required assets',()=>{
  const pkg=JSON.parse(read('package.json'));
  const win=pkg.build.win.target.map(v=>v.target);
  assert.deepEqual(win,['portable','nsis']);
+ assert.ok(pkg.build.win.target.every(v=>v.arch.length===1&&v.arch[0]==='x64'));
+ assert.equal(pkg.build.nsis.perMachine,false);
+ assert.equal(pkg.build.nsis.allowElevation,false);
+ assert.equal(pkg.build.nsis.createDesktopShortcut,true);
+ assert.equal(pkg.build.nsis.createStartMenuShortcut,true);
+ assert.deepEqual(pkg.build.fileAssociations,[{ext:'ns',name:'Nocturne Notes Project',description:'Nocturne Notes project',role:'Editor'}]);
  assert.equal(pkg.build.nsis.deleteAppDataOnUninstall,false);
  assert.equal(pkg.build.nsis.include,'build/installer.nsh');
  assert.deepEqual(pkg.build.nsis.installerLanguages,['en_US','ru_RU']);
  assert.equal(pkg.build.portable.requestExecutionLevel,'user');
  assert.equal(pkg.build.portable.artifactName,'Nocturne Notes Portable.exe');
- assert.equal(pkg.build.nsis.artifactName,'Nocturne Notes Setup ${version}.exe');
+ assert.equal(pkg.build.nsis.artifactName,'Nocturne Notes Setup.exe');
  assert.deepEqual(pkg.build.electronLanguages,['en-US','ru']);
  assert.equal(pkg.build.nsis.oneClick,false);
  assert.equal(pkg.build.nsis.allowToChangeInstallationDirectory,true);
@@ -45,8 +51,8 @@ test('Windows installer packages only two locales and required assets',()=>{
  assert.ok(pkg.build.files.includes('brand.css'));
  assert.ok(pkg.build.files.includes('preview-api.js'));
  assert.ok(pkg.build.files.includes('window-shape.js'));
- assert.equal(pkg.version,'2.0.0');
- assert.equal(pkg.devDependencies.electron,'45.4.1');
+ assert.equal(pkg.version,'2.5.0');
+ assert.equal(pkg.devDependencies.electron,'45.5.0');
  assert.ok(pkg.build.files.includes('corner-resize.js'));
  assert.equal(pkg.build.win.icon,'assets/nocturne-notes-refined.ico');
  assert.ok(pkg.build.asar);
@@ -77,7 +83,7 @@ test('native region updates synchronously on every size change',()=>{
  assert.match(main,/win\.on\('resized',updateWindowRegion\)/);
  assert.match(main,/win\.setBounds\(next\);updateWindowRegion\(\)/);
  assert.doesNotMatch(main,/regionTimer|scheduleRegion/);
- // Keep the proven 1.5.2 real native silhouette, never a CSS corner mask.
+ // Keep the native window silhouette, never substitute a CSS corner mask.
  assert.match(main,/win\.setShape\(maximized\?\[\]:roundWindowRegion\(width,height,29\)\)/);
 });
 test('footer group centers on whole sidebar with identical 36px buttons',()=>{
@@ -118,12 +124,12 @@ test('only pointer-driven bounds are coalesced; release applies the last sample'
  assert.match(main,/win.setBounds\(next\);updateWindowRegion\(\)/);
 });
 
-test('stable Portable profile is separate and version-independent; all eight grips exist',()=>{
+test('Portable uses a separate profile; all eight resize grips exist',()=>{
  const main=read('main.js'),preload=read('preload.js'),css=read('windows-shell.css');
  assert.match(main,/const isPortable=app.isPackaged&&!!process.env.PORTABLE_EXECUTABLE_FILE/);
  assert.match(main,/if\(isPortable\)/);
  assert.match(main,/Nocturne Notes Portable'/);
- assert.doesNotMatch(main,/portable\.experiment|Nocturne Notes Portable \d/);
+ assert.match(main,/com\.nocturnenotes\.desktop\.portable':'com\.nocturnenotes\.desktop'/);
  assert.match(main,/app.setPath\('userData',profile\)/);
  assert.match(preload,/\['nw','ne','sw','se','n','s','w','e'\]/);
  assert.match(css,/\.corner-e \{ right:0/);

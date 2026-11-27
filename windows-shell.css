@@ -15,9 +15,8 @@ body.is-electron .window {
 /* Full-screen windows keep the same editor while dropping only outer corner rounding. */
 body.is-electron .window.is-maximized { border-radius: 0 !important; }
 
-/* 1.5.4: center the three 36px controls against the FULL sidebar width.
-   The former grid inherited 19px side margins and additional responsive rules,
-   which shifted/overflowed the visual group. No approved base CSS changes. */
+/* Center the three 36px controls against the full sidebar width.
+   Avoid inherited margins and responsive rules shifting the control group. */
 body.is-electron .sidebar-footer {
   width: 100%;
   margin: 0 !important;
@@ -94,7 +93,7 @@ body.is-electron .corner-sw { bottom:0; left:0; width:25px; height:25px; cursor:
 body.is-electron .corner-se { bottom:0; right:0; width:25px; height:25px; cursor:nwse-resize; }
 body.is-electron:has(.window.is-maximized) .nocturne-native-corner-grip { display:none; }
 
-/* 1.5.5 desktop typography: the approved preview remains immutable.
+/* Desktop typography: the approved preview remains immutable.
    Match its normal-size desktop appearance, independent of viewport width.
    Keep the user's body font size and line-height settings authoritative. */
 body.is-electron { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
@@ -124,7 +123,7 @@ body.is-electron .editor { font-size: var(--font-size, 17px); }
 body.is-electron .app-name,
 body.is-electron .project-caption { font-size: 15px; }
 
-/* Alpha experiment: one transparent surface; keep the approved outer radius.
+/* Alpha window: one transparent surface; keep the approved outer radius.
    All eight directions are accessible without a Win32 thick frame. */
 body.is-electron[data-corner-mode="alpha"] .corner-nw,
 body.is-electron[data-corner-mode="alpha"] .corner-ne,

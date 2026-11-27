@@ -3,6 +3,7 @@
 // win.setShape(rects) crops ALL window pixels outside this region on Windows.
 // One-pixel scan lines give stable corners on the approved 100%-DPI system.
 // No extra dependencies, overlay windows, or CSS changes.
+/** @param {number} width @param {number} height @param {number} [radius] */
 function roundWindowRegion(width,height,radius=29){
  if(!Number.isInteger(width)||!Number.isInteger(height)||width<1||height<1)
   throw new RangeError('Invalid window bounds');

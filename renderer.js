@@ -3,16 +3,20 @@
  const api=window.nocturneNotes;
  const $=s=>document.querySelector(s);
  const refs={win:$('#window'),menuToggle:$('#menu-toggle'),appMenu:$('#app-menu'),submenu:$('#submenu'),list:$('#note-list'),sidebar:$('#sidebar'),resizer:$('#sidebar-resizer'),sidebarTab:$('#sidebar-tab'),addNote:$('#add-note'),saveShortcut:$('#save-shortcut'),searchCounter:$('#search-counter'),searchNavigation:$('#search-navigation'),searchPrevious:$('#search-previous'),searchNext:$('#search-next'),searchToggle:$('#search-toggle'),searchPanel:$('#sidebar-search'),searchQuery:$('#search-query'),searchReplacement:$('#search-replacement'),searchScopeButtons:document.querySelectorAll('[data-search-scope]'),searchReplaceOne:$('#search-replace-one'),searchReplaceAll:$('#search-replace-all'),title:$('#note-title'),editor:$('#editor'),scroll:$('#editor-scroll'),toolbar:$('#floating-toolbar'),headingPopover:$('#heading-popover'),colorPopover:$('#color-popover'),context:$('#note-menu'),dialog:$('#dialog-backdrop'),dialogHeading:$('#dialog-heading'),dialogMessage:$('#dialog-message'),dialogInput:$('#dialog-input'),dialogOptions:$('#dialog-options'),dialogConfirm:$('#dialog-confirm'),dialogCancel:$('#dialog-cancel'),toast:$('#toast')};
- let searchOpen=false,searchScope='note',searchHits=[],searchCursor=-1;
+ let searchOpen=false,searchScope='note',searchHits={groups:[],length:0},searchCursor=-1;
  let state=null,busy=false,saveTimer=null,savePromise=Promise.resolve(),activeContextId=null,preservedRange=null,dialogResolve=null,toastTimer=null;
   const {DEFAULT_SETTINGS,EDITOR_FONTS}=window.NocturneSettings;
  const {text:translate,errorText,locale}=window.NocturneI18n;
  const t=key=>translate(settings.language,key);
+ const bookmarkIcon='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v17l-7-4.5L5 21Z"/></svg>';
+ const lockIcon='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10V7a5 5 0 0 1 10 0v3"/><rect x="4.5" y="10" width="15" height="11" rx="2.5"/><path d="M12 14v3"/></svg>';
+ let lockPending=false,lockFailed=false,lockedHeading;
  const staticStrings=[];
  let settings={...DEFAULT_SETTINGS};
  const statuses=new Map(),revisions=new Map();
  let cachedPayload=null,formatPopoversReady=false;
  let recoveryTimer=null;
+ let projectOperation=false,externalWaiting=false;
  const scrollOffsets=new Map();
  let shellStylesReady = Promise.resolve();
  // Keep the frozen reference unchanged; all new UI is an additive layer.
@@ -30,7 +34,7 @@
   else {const s=window.getSelection();if(s?.rangeCount&&refs.editor.contains(s.anchorNode)&&refs.editor.contains(s.focusNode))result.selection={field:'body',anchor:pathFor(s.anchorNode),focus:pathFor(s.focusNode),a:s.anchorOffset,f:s.focusOffset};}
   return result;
  }
- function storedSnapshot(n){return {title:n.title==='Без названия'?'':n.title,html:n.html,scroll:scrollOffsets.get(n.id)||0};}
+ function storedSnapshot(n){return {title:n.title==='Без названия'?'':n.title,html:sanitizeHTML(n.html),scroll:scrollOffsets.get(n.id)||0};}
  function updateHistoryButtons(){if(!undoButton)return;undoButton.disabled=!(historyPending||history?.can(state?.activeId,'undo'));redoButton.disabled=historyPending||!history?.can(state?.activeId,'redo');}
  function commitHistory(){clearTimeout(historyTimer);historyTimer=null;if(historyPending&&history&&state?.activeId){historyPending=false;history.record(state.activeId,editSnapshot());}lastEditKey='';updateHistoryButtons();}
  function scheduleHistory(){
@@ -47,7 +51,7 @@
   lastEditKey=key;lastEditAt=performance.now();
  }
  function applyHistory(dir){
-  if(!history||!state?.activeId||busy)return;
+  if(!history||!state?.activeId||busy||projectOperation)return;
   commitHistory();const value=history.move(state.activeId,dir);if(!value)return;
   historyRestoring=true;
   try{
@@ -57,7 +61,7 @@
    if(s?.field==='title'){refs.title.focus({preventScroll:true});refs.title.setSelectionRange(s.start,s.end);}
    else{refs.editor.focus({preventScroll:true});const sel=window.getSelection(),a=s?.anchor&&nodeFor(s.anchor),f=s?.focus&&nodeFor(s.focus);
     if(a&&f){try{sel.setBaseAndExtent(a,s.a,f,s.f);}catch{sel.collapse(refs.editor,0);}}else sel.collapse(refs.editor,0);}
-   queueSave();renderList();if(searchOpen)refreshSearchMatches();
+   queueSave();if(searchOpen)refreshSearchMatches();else renderList();
   }finally{historyRestoring=false;updateHistoryButtons();}
  }
  function recordExternal(n,next){if(!history)return;if(!history.notes.has(n.id))history.resetCurrent(n.id,storedSnapshot(n));history.record(n.id,storedSnapshot({...n,...next}));}
@@ -83,6 +87,9 @@
   document.querySelector('.drag-space').before(group);undoButton=$('#edit-undo');redoButton=$('#edit-redo');
   const add=(menu,attr,key,label,markup,before)=>{const b=document.createElement('button');b.type='button';b.setAttribute(attr,key);b.setAttribute('role','menuitem');b.innerHTML=markup+'<span>'+label+'</span>';menu.insertBefore(b,before);return b;};
   add(refs.context,'data-note-action','duplicate','Дублировать',icon('copy'),refs.context.querySelector('[data-note-action="move-up"]'));
+  add(refs.context,'data-note-action','pin-note','Закрепить',bookmarkIcon,refs.context.querySelector('[data-note-action="move-up"]'));
+  refs.context.querySelector('[data-note-action="rename"] kbd')?.remove(); // F2 itself remains supported.
+  refs.context.querySelectorAll('button > span').forEach(label=>label.classList.add('context-label'));
   refs.context.querySelector('[data-note-action="delete"] span').textContent='В корзину';
   // Preserve the menu's original SVG viewport and stroke styling.
   for(const [action,d] of [['move-up','m5 15 7-7 7 7'],['move-down','m5 9 7 7 7-7']]){
@@ -90,21 +97,30 @@
    svg.setAttribute('viewBox','0 0 24 24');svg.innerHTML='<path d="'+d+'"/>';
   }
   const settingsRow=refs.appMenu.querySelector('[data-action="settings"]');
+  if(api.isDesktop){
+   const shield='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4.5 6v5c0 5.1 3.1 8.2 7.5 10 4.4-1.8 7.5-4.9 7.5-10V6L12 3Z"/><path d="m9 12 2 2 4-4"/></svg>';
+   const row=add(refs.appMenu,'data-action','protection','Защита проекта',shield,refs.appMenu.querySelector('[data-action="export"]'));
+   row.insertAdjacentHTML('beforeend','<svg class="chevron"><use href="#i-chevron-right"/></svg>');
+  }
   add(refs.appMenu,'data-action','trash','Корзина','<svg><use href="#i-trash"/></svg>',settingsRow);
   // Only the SVG path changes; keep the approved menu glyph size and styling.
   $('#i-trash path').setAttribute('d','M3 6h18M8 6l1-3h6l1 3M5 6l1 13q0 2 2 2h8q2 0 2-2l1-13M10 10v7M14 10v7');
+  lockedHeading=document.createElement('div');lockedHeading.id='locked-project-title';lockedHeading.className='note-title locked-project-title';lockedHeading.setAttribute('role','heading');lockedHeading.setAttribute('aria-level','1');lockedHeading.hidden=true;lockedHeading.innerHTML=lockIcon+'<span></span>';refs.title.after(lockedHeading);
   const quick=document.createElement('div');quick.className='quick-window-actions no-drag';
-  for(const [id,key,label,fn] of [['focus-mode','focus','Режим концентрации · F11',()=>toggleFocus()],['always-top','pin','Поверх всех окон · Ctrl+Shift+T',()=>void toggleTop()]]){
-   if(id==='always-top'&&!api.isDesktop)continue;
-   const b=document.createElement('button');b.id=id;b.type='button';b.className='glass-round';b.title=label;b.setAttribute('aria-label',label);b.innerHTML=icon(key);
+  for(const [id,key,label,fn] of [['panic-lock','lock','Установить пароль · Ctrl+Shift+L',()=>void toggleProjectLock()],['focus-mode','focus','Режим концентрации · F11',()=>toggleFocus()],['always-top','pin','Поверх всех окон · Ctrl+Shift+T',()=>void toggleTop()]]){
+   if((id==='always-top'||id==='panic-lock')&&!api.isDesktop)continue;
+   const b=document.createElement('button');b.id=id;b.type='button';b.className='glass-round';b.title=label;b.setAttribute('aria-label',label);b.innerHTML=key==='lock'?lockIcon:icon(key);
+   if(id==='panic-lock')b.disabled=true;
    if(id==='always-top')b.setAttribute('aria-pressed','false');
    b.addEventListener('pointerdown',e=>e.preventDefault());b.addEventListener('click',fn);quick.appendChild(b);
   }
   document.querySelector('.window-controls').before(quick);
   if(api.isDesktop)void api.alwaysOnTop().then(v=>{topmost=v;$('#always-top').setAttribute('aria-pressed',String(v));}).catch(report);
  }
- async function duplicateNote(id){if(!await flush())return;try{const p=await api.duplicateNote(id);syncProject(p,true);toast('Копия создана');}catch(e){report(e)}}
- async function trashDialog(){
+ async function duplicateNote(id){return runProjectTask(()=>duplicateNoteTask(id));}
+ async function duplicateNoteTask(id){if(!await flush())return;try{const p=await api.duplicateNote(id);syncProject(p,true);toast('Копия создана');}catch(e){report(e)}}
+ async function trashDialog(){return runProjectTask(()=>trashDialogTask());}
+ async function trashDialogTask(){
   if(!await flush())return;
   try{
    for(;;){
@@ -119,7 +135,7 @@
       addButton(row,'Восстановить',async()=>{syncProject(await api.restoreTrash(item.id),true);toast('Заметка восстановлена');});
       addButton(row,'Удалить',async()=>{if(await dialogBox({title:'Удалить навсегда?',message:item.title,confirm:'Удалить'}))await api.purgeTrash(item.id);});list.appendChild(row);
      }
-     addButton(list,'Очистить корзину',async()=>{if(await dialogBox({title:'Очистить корзину?',message:t('Все удаленные заметки будут удалены окончательно.'),confirm:'Очистить'}))await api.purgeTrash(null);});
+     addButton(list,'Очистить корзину',async()=>{if(await dialogBox({title:'Очистить корзину?',message:t('Все удаленные заметки будут удалены окончательно'),confirm:'Очистить'}))await api.purgeTrash(null);});
     }
     await promise;refs.dialog.classList.remove('trash-open');if(!action)break;await action();
    }
@@ -184,39 +200,14 @@
   $('#max-btn').title=t(refs.win.classList.contains('is-maximized')?'Восстановить размер':'Развернуть');
   const pin=$('#always-top');if(pin){pin.title=t(topmost?'Отключить поверх всех окон · Ctrl+Shift+T':'Поверх всех окон · Ctrl+Shift+T');pin.setAttribute('aria-label',pin.title);}
   if(formatPopoversReady)fillFormatPopovers();
-  if(state){updateProjectCaption(state);renderList();renderSaveIndicator();}
+  if(state){updateProjectCaption(state);updateProtectionUI();renderList();renderSaveIndicator();}
  }
  function toast(s){refs.toast.textContent=t(s);refs.toast.hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>refs.toast.hidden=true,3000)}
  function report(err){console.error(err);toast(errorText(settings.language,err?.message)||'Не удалось выполнить действие')}
  const readNote=()=>state?.notes.find(n=>n.id===state.activeId);
  function nameOrFallback(text){return String(text||'').trim()||'Без названия'}
  function displayNoteName(value){const title=nameOrFallback(value);return title==='Без названия'?t('Без названия'):title;}
- function sanitizeHTML(html){
-  const parsed=new DOMParser().parseFromString(`<body>${String(html||'')}</body>`,'text/html');
-  const allowed=new Set(['p','div','br','strong','b','em','i','u','s','strike','del','h1','h2','h3','h4','h5','h6','ul','ol','li','a','span','font','blockquote']);
-  const forbidden=new Set(['script','style','svg','iframe','object','embed','img','link','meta','form','input','button','video','audio','math','textarea']);
-  const safeColor=c=>/^#[0-9a-f]{3,8}$/i.test(c||'')||/^rgb\(\d{1,3},\s*\d{1,3},\s*\d{1,3}\)$/i.test(c||'');
-  function clean(node){
-   if(node.nodeType===3)return document.createTextNode(node.textContent);
-   if(node.nodeType!==1)return document.createDocumentFragment();
-   const tag=node.tagName.toLowerCase();
-   if(forbidden.has(tag))return document.createDocumentFragment();
-   const dest=document.createElement(allowed.has(tag)?({div:'p',b:'strong',i:'em',strike:'s',del:'s',font:'span'}[tag]||tag):'span');
-   if(tag==='a'){
-    const href=node.getAttribute('href')||'';
-    if(/^(https?:\/\/|mailto:)/i.test(href)){dest.setAttribute('href',href);dest.setAttribute('target','_blank');dest.setAttribute('rel','noopener noreferrer')}
-   }
-   if(tag==='span'||tag==='font'){
-    let color=tag==='font'?(node.getAttribute('color')||''):node.style?.color||'';
-    if(safeColor(color))dest.style.color=color;
-   }
-   for(const child of [...node.childNodes])dest.appendChild(clean(child));
-   return dest;
-  }
-  const wrapper=document.createElement('div');
-  for(const el of [...parsed.body.childNodes])wrapper.appendChild(clean(el));
-  return wrapper.innerHTML||'<p></p>';
- }
+ function sanitizeHTML(html){return window.NocturneContent.sanitizeDOM(html);}
  function notePayload(){
   const n=readNote();if(!n)return null;
   const revision=revisions.get(n.id)||0;
@@ -240,7 +231,13 @@
   if(!api.saveRecoveryDraft)return;
   clearTimeout(recoveryTimer);
   recoveryTimer=setTimeout(()=>{
-   recoveryTimer=null;const value=notePayload();if(value)void api.saveRecoveryDraft(value).catch(error=>{console.error('Recovery backup failed:',error);toast('Не удалось создать восстановительный черновик')});
+   recoveryTimer=null;const value=notePayload();if(!value)return;
+   const project=state,revision=revisions.get(value.id)||0;
+   const work=savePromise.then(()=>{
+    if(state!==project||(revisions.get(value.id)||0)!==revision||noteStatus(value.id)==='saved')return;
+    return api.saveRecoveryDraft(value);
+   });
+   savePromise=work.catch(error=>{console.error('Recovery backup failed:',error);toast('Не удалось создать восстановительный черновик')});
   },450);
  }
  function queueSave(){
@@ -249,6 +246,7 @@
   // Avoid serializing and sanitizing the full document for every keystroke.
   // Search needs current text immediately; recovery/save capture it on demand.
   const n=readNote();if(n)n.title=nameOrFallback(refs.title.value);
+   window.nocturneSearch.invalidate(id);
   if(searchOpen)updateLocalNote();
   markStatus(id,'pending');scheduleHistory();
   queueRecovery();clearTimeout(saveTimer);saveTimer=setTimeout(()=>void persistActive(),settings.autosaveMs);
@@ -272,13 +270,22 @@
   try{await promise;if((revisions.get(id)||0)===revision)markStatus(id,'saved');return true;}
   catch(e){if((revisions.get(id)||0)===revision)markStatus(id,'error');report(e);return false;}
  }
- async function flush(){if(!historyRestoring)commitHistory();const ok=await persistActive();await savePromise;return ok}
+ async function flush(){
+  if(!historyRestoring)commitHistory();
+  for(;;){
+   const project=state,id=state?.activeId,revision=revisions.get(id)||0;
+   const ok=await persistActive();await savePromise;
+   if(!ok||state!==project||state?.activeId!==id)return false;
+   if((revisions.get(id)||0)===revision)return true;
+  }
+ }
  function syncProject(project,preserveHistory=false){
   commitHistory();if(!preserveHistory){history?.clear();scrollOffsets.clear();}
   if(searchOpen)closeSearch();
   state={...project,notes:project.notes.map(n=>({...n}))};
-  statuses.clear();revisions.clear();cachedPayload=null;clearTimeout(recoveryTimer);recoveryTimer=null;
-  updateProjectCaption(project);
+  statuses.clear();revisions.clear();window.nocturneSearch.clearCache();cachedPayload=null;clearTimeout(recoveryTimer);recoveryTimer=null;clearTimeout(saveTimer);saveTimer=null;
+   savePromise=Promise.resolve();window.getSelection()?.removeAllRanges();
+  updateProjectCaption(project);updateProtectionUI();
   renderList();renderNote();closeMenus();
  }
  function updateProjectCaption(project){
@@ -286,69 +293,253 @@
   refs.win.dataset.project=projectName;
   const projectCaption=$('#project-caption');
   projectCaption.textContent='— '+projectName;
-  projectCaption.title=projectName;
+  projectCaption.title=projectName+(project.locked?' — '+t('Проект заблокирован'):project.encrypted?' — '+t('Проект защищен'):'');
   document.title='Nocturne Notes — '+projectName;
  }
+ // Reconcile by note ID: preserve rows, focus and DOM identity across searches.
+ // One delegated handler per event, not eight new closures per row per render.
  function renderList(){
-  refs.list.textContent='';
-  if(!state)return;
+  if(!state){refs.list.replaceChildren();return;}
   const query=searchOpen?refs.searchQuery.value.trim():'';
-  const filtered=state.notes.filter(n=>!query||((searchScope==='project'||n.id===state.activeId)&&window.nocturneSearch.countMatches(n,query)>0));
-  if(searchOpen)updateSearchCounter();
-  if(query&&!filtered.length){const empty=document.createElement('div');empty.className='search-empty';empty.textContent=t('Ничего не найдено');refs.list.appendChild(empty);}
-  filtered.forEach(n=>{
-   const row=document.createElement('button');row.type='button';row.className='note-row'+(n.id===state.activeId?' active':'');row.title=displayNoteName(n.title);const label=document.createElement('span');label.className='note-row-label';label.textContent=displayNoteName(n.title);row.appendChild(label);
-   if(n.id===state.activeId&&settings.saveIndicatorsEnabled){const dot=document.createElement('span');dot.className='note-save-dot';dot.dataset.status=noteStatus(n.id);dot.title=t(SAVE_LABELS[noteStatus(n.id)]);dot.setAttribute('aria-hidden','true');row.appendChild(dot)}
-   row.dataset.id=n.id;row.setAttribute('role','option');row.setAttribute('aria-selected',String(n.id===state.activeId));row.draggable=true;
-   row.addEventListener('click',async()=>{await selectNote(n.id);if(searchOpen){refreshSearchMatches({preferNoteId:n.id});showCurrentSearchHit(true);}});
-   row.addEventListener('dblclick',()=>void renameNote(n.id));
-   row.addEventListener('contextmenu',e=>{e.preventDefault();openContext(n.id,e.clientX,e.clientY)});
-   row.addEventListener('dragstart',e=>{e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',n.id);row.classList.add('dragging')});
-   row.addEventListener('dragend',()=>{row.classList.remove('dragging');refs.list.querySelectorAll('.drag-target').forEach(el=>el.classList.remove('drag-target'))});
-   row.addEventListener('dragover',e=>{e.preventDefault();row.classList.add('drag-target')});
-   row.addEventListener('dragleave',()=>row.classList.remove('drag-target'));
-   row.addEventListener('drop',e=>{e.preventDefault();row.classList.remove('drag-target');const dragging=e.dataTransfer.getData('text/plain');void moveNote(dragging,n.id)});
-   refs.list.appendChild(row);
+  const matched=query?new Set(searchHits.groups.map(g=>g.noteId)):null;
+  const filtered=matched?state.notes.filter(n=>matched.has(n.id)):state.notes;
+  const previous=new Map([...refs.list.children].filter(el=>el.classList.contains('note-row')).map(el=>[el.dataset.id,el]));
+  const wanted=new Set(filtered.map(n=>n.id));
+  for(const [id,row] of previous)if(!wanted.has(id))row.remove();
+  let empty=refs.list.querySelector('.search-empty');
+  if(query&&!filtered.length){
+   if(!empty){empty=document.createElement('div');empty.className='search-empty';refs.list.appendChild(empty);}
+   empty.textContent=t('Ничего не найдено');
+  }else empty?.remove();
+  let separator=refs.list.querySelector('.pinned-divider');
+  const needsDivider=filtered.some(n=>n.pinned)&&filtered.some(n=>!n.pinned);
+  if(!needsDivider){separator?.remove();separator=null;}
+  else if(!separator){separator=document.createElement('div');separator.className='pinned-divider';separator.setAttribute('role','presentation');separator.setAttribute('aria-hidden','true');}
+  let position=refs.list.firstElementChild,dividerPlaced=false;
+  for(const n of filtered){
+   if(separator&&!n.pinned&&!dividerPlaced){
+    if(position!==separator)refs.list.insertBefore(separator,position);else position=position.nextElementSibling;
+    dividerPlaced=true;
+   }
+   let row=previous.get(n.id);
+   if(!row){
+    row=document.createElement('button');row.type='button';row.className='note-row';row.dataset.id=n.id;row.setAttribute('role','option');
+    const label=document.createElement('span');label.className='note-row-label';row.appendChild(label);
+   }
+   const active=n.id===state.activeId,name=displayNoteName(n.title),label=row.firstElementChild;
+   if(row.title!==name)row.title=name;
+   if(label.textContent!==name)label.textContent=name;
+   row.classList.toggle('active',active);row.setAttribute('aria-selected',String(active));row.draggable=!n.pinned;
+   let badge=row.querySelector('.note-bookmark');
+   if(n.pinned){
+    if(!badge){badge=document.createElement('span');badge.className='note-bookmark';badge.innerHTML=bookmarkIcon;label.after(badge);}
+    badge.title=t('Закрепленная заметка');badge.setAttribute('aria-label',badge.title);
+   }else badge?.remove();
+   let dot=row.querySelector('.note-save-dot');
+   if(active&&settings.saveIndicatorsEnabled){
+    if(!dot){dot=document.createElement('span');dot.className='note-save-dot';dot.setAttribute('aria-hidden','true');row.appendChild(dot);}
+    const status=noteStatus(n.id);dot.dataset.status=status;dot.title=t(SAVE_LABELS[status]);
+   }else dot?.remove();
+   if(position!==row)refs.list.insertBefore(row,position);else position=position.nextElementSibling;
+  }
+ }
+ function bindNoteList(){
+  const rowFor=e=>e.target.closest('.note-row');
+  let dragged=null;
+  const resetDrag=()=>{dragged=null;refs.list.querySelectorAll('.dragging,.drag-target').forEach(el=>el.classList.remove('dragging','drag-target'));};
+  refs.list.addEventListener('click',e=>{const row=rowFor(e);if(!row||projectOperation||!refs.dialog.hidden)return;void runProjectTask(async()=>{
+   const id=row.dataset.id;await switchNote(id);
+   if(searchOpen&&state.activeId===id){refreshSearchMatches({preferNoteId:id});await showCurrentSearchHit(true,true);}
+  });});
+  refs.list.addEventListener('dblclick',e=>{const row=rowFor(e);if(row)void renameNote(row.dataset.id);});
+  refs.list.addEventListener('contextmenu',e=>{const row=rowFor(e);if(!row)return;e.preventDefault();if(!projectOperation&&refs.dialog.hidden)openContext(row.dataset.id,e.clientX,e.clientY);});
+  refs.list.addEventListener('dragstart',e=>{const row=rowFor(e);if(!row||!row.draggable||projectOperation||!e.dataTransfer){e.preventDefault();return;}dragged=row.dataset.id;e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',dragged);row.classList.add('dragging');});
+  refs.list.addEventListener('dragend',resetDrag);
+  refs.list.addEventListener('dragover',e=>{const row=rowFor(e);if(!row||!dragged||projectOperation||!state)return;
+   const a=state.notes.findIndex(n=>n.id===dragged),b=state.notes.findIndex(n=>n.id===row.dataset.id);
+   if(canMove(a,b)){e.preventDefault();row.classList.add('drag-target');}
   });
+  refs.list.addEventListener('dragleave',e=>{const row=rowFor(e);if(row&&!row.contains(e.relatedTarget))row.classList.remove('drag-target');});
+  refs.list.addEventListener('drop',e=>{const row=rowFor(e);if(!row||!dragged)return;e.preventDefault();const id=dragged;resetDrag();void moveNote(id,row.dataset.id);});
  }
  function renderNote(){
   const n=readNote();cachedPayload=null;busy=true;refs.toolbar.hidden=true;refs.headingPopover.hidden=true;refs.colorPopover.hidden=true;
   preservedRange=null;
   if(n){refs.title.value=n.title==='Без названия'?'':n.title;refs.editor.innerHTML=sanitizeHTML(n.html);refs.scroll.scrollTop=scrollOffsets.get(n.id)||0;}
-  else{refs.title.value='';refs.editor.innerHTML='<p></p>'}
+  else{refs.title.value='';refs.editor.innerHTML=state?.locked?'':'<p></p>'}
   busy=false;
   if(n&&history)history.resetCurrent(n.id,editSnapshot());updateHistoryButtons();
  }
- async function selectNote(id){if(!state||id===state.activeId)return;const old=state.activeId;scrollOffsets.set(old,refs.scroll.scrollTop);if(!await flush())return;state.activeId=id;try{await api.selectNote(id);}catch(e){state.activeId=old;report(e);return;}renderList();renderNote();}
- async function createNote(){if(searchOpen)closeSearch();if(!await flush())return;try{const newNote=await api.createNote();state.notes.push(newNote);state.activeId=newNote.id;renderList();renderNote();refs.title.focus();refs.title.select();}catch(e){report(e)}}
- async function newProject(){if(!await flush())return;try{const p=await api.createProject();syncProject(p);toast('Создан новый проект')}catch(e){report(e)}}
- async function openProject(){if(!await flush())return;try{const p=await api.openProject();if(p){syncProject(p);toast('Проект открыт')}}catch(e){report(e)}}
- async function openRecent(file){if(!await flush())return;try{const p=await api.openRecent(file);if(p){syncProject(p);toast('Проект открыт')}}catch(e){report(e)}}
- async function saveProject(){if(!await flush())return;try{const info=await api.saveProject();if(info){if(info.notes)syncProject(info,true);toast(api.isDesktop?'Проект сохранен':'Черновик сохранен в браузере')}}catch(e){report(e)}}
- async function saveAs(){if(!await flush())return;try{const p=await api.saveAsProject();if(p){if(p.notes)syncProject(p,true);toast(api.isDesktop?'Проект сохранен как .ns':'Скачана JSON-копия предпросмотра')}}catch(e){report(e)}}
- async function exportNote(format){if(!await flush())return;try{const filename=await api.exportNote(state.activeId,format);if(filename)toast(t('Экспортировано: ')+format.toUpperCase())}catch(e){report(e)}}
- async function deleteNote(id){
+ async function selectNote(id){return runProjectTask(()=>switchNote(id));}
+ async function switchNote(id){
+  if(!state||id===state.activeId||!state.notes.some(n=>n.id===id))return;
+  const old=state.activeId;scrollOffsets.set(old,refs.scroll.scrollTop);
+  if(!await flush())return;
+  await api.selectNote(id);state.activeId=id;renderNote();if(searchOpen)refreshSearchMatches();else renderList();
+ }
+ async function createNote(){return runProjectTask(()=>createNoteTask());}
+ async function createNoteTask(){if(state?.locked)return;if(searchOpen)closeSearch();if(!await flush())return;try{const newNote=await api.createNote();state.notes.push(newNote);state.activeId=newNote.id;renderList();renderNote();refs.title.focus();refs.title.select();}catch(e){report(e)}}
+ function updateProtectionUI(){
+  const locked=!!state?.locked;
+  const concealed=locked||lockPending;
+  refs.menuToggle.disabled=lockPending;
+  refs.title.disabled=locked;refs.title.readOnly=projectOperation;refs.editor.contentEditable=concealed||projectOperation?'false':'true';
+  refs.title.hidden=concealed;lockedHeading.hidden=!concealed;
+  lockedHeading.querySelector('span').textContent=concealed?t(locked?'Проект заблокирован':lockFailed?'Не удалось заблокировать проект':'Блокировка проекта'):'';
+  refs.win.classList.toggle('privacy-pending',lockPending);
+  refs.editor.dataset.placeholder=concealed?'':t('Начни писать...');
+  const panic=$('#panic-lock');if(panic){
+   // A plain project can enter the normal password-setup flow. Only the
+   // temporary operation guard disables the action, not the protection state.
+   panic.disabled=!state||projectOperation||lockPending;
+   panic.title=t(locked?'Разблокировать проект · Ctrl+Shift+L':state?.encrypted?'Заблокировать проект · Ctrl+Shift+L':'Установить пароль · Ctrl+Shift+L');
+   panic.setAttribute('aria-label',panic.title);
+  }
+  refs.addNote.disabled=locked;refs.saveShortcut.disabled=locked;refs.searchToggle.disabled=locked;
+  for(const action of ['save','save-as','export','trash']){const row=refs.appMenu.querySelector('[data-action="'+action+'"]');if(row)row.disabled=locked;}
+ }
+ async function runProjectTask(fn){
+  if(projectOperation)return;
+  // Capture the edit and selection before temporarily freezing the fields.
+  commitHistory();projectOperation=true;updateProtectionUI();
+  try{await fn();}catch(e){report(e);}
+  finally{projectOperation=false;updateProtectionUI();void drainExternal();}
+ }
+ async function drainExternal(){
+  if(!externalWaiting||projectOperation||!refs.dialog.hidden||!state)return;
+  externalWaiting=false;await runProjectTask(async()=>{if(await flush())await completeOpen(await api.openExternal());});
+ }
+ async function completeOpen(result){
+  if(!result)return false;
+  if(!result.passwordRequired){syncProject(result);toast('Проект открыт');return true;}
+  let error='';
+  for(;;){
+   const values=await passwordDialog('unlock',result.name,error);
+   if(!values){await api.cancelUnlock(result.token);return false;}
+   try{
+    const p=await api.unlockProject({token:result.token,password:values.current});
+    syncProject(p);toast('Проект открыт');return true;
+   }catch(e){error=errorText(settings.language,e.message);}
+   finally{values.current='';}
+  }
+ }
+ async function newProject(){return runProjectTask(async()=>{if(!await flush())return;const p=await api.createProject();if(p){syncProject(p);toast('Создан новый проект');}});}
+ async function openProject(){return runProjectTask(async()=>{if(await flush())await completeOpen(await api.openProject());});}
+ async function openRecent(file){return runProjectTask(async()=>{if(await flush())await completeOpen(await api.openRecent(file));});}
+ async function saveProject(){if(state?.locked)return;return runProjectTask(async()=>{if(!await flush())return;const info=await api.saveProject();if(info){if(info.notes)syncProject(info,true);toast(api.isDesktop?'Проект сохранен':'Черновик сохранен в браузере');}});}
+ async function saveAs(){if(state?.locked)return;return runProjectTask(async()=>{if(!await flush())return;const p=await api.saveAsProject();if(p){if(p.notes)syncProject(p,true);toast(api.isDesktop?'Проект сохранен как .ns':'Скачана JSON-копия предпросмотра');}});}
+ async function exportNote(format){if(state?.locked)return;return runProjectTask(async()=>{
+  if(!await flush())return;
+  if(state.encrypted&&!await dialogBox({title:'Экспорт без шифрования',message:t('Экспортируемый файл не защищен паролем'),confirm:'Экспортировать'}))return;
+  const filename=await api.exportNote(state.activeId,format,!!state.encrypted);
+  if(filename)toast(t('Экспортировано: ')+format.toUpperCase());
+ });}
+ const privacyIcons={
+  eye:'<path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6Z"/><circle cx="12" cy="12" r="2.5"/>',
+  eyeOff:'<path d="M3 3l18 18M10 6.2A10 10 0 0 1 12 6c6.5 0 10 6 10 6a17 17 0 0 1-3 3.5M6.3 7.6C3.5 9.6 2 12 2 12s3.5 6 10 6a10 10 0 0 0 4-.8"/>'
+ };
+ function privacyIcon(kind){return '<svg viewBox="0 0 24 24" aria-hidden="true">'+privacyIcons[kind]+'</svg>';}
+ async function passwordDialog(kind,name='',error=''){
+  const fields=kind==='unlock'||kind==='remove'?[['current','Пароль']]:kind==='change'?[['current','Текущий пароль'],['password','Новый пароль'],['repeat','Повторите пароль']]:[['password','Пароль'],['repeat','Повторите пароль']];
+  const title={unlock:'Защищенный проект',protect:'Защитить проект',change:'Изменить пароль',remove:'Снять защиту'}[kind];
+  const message=kind==='unlock'?name:kind==='remove'?t('Проект станет доступен без пароля'):t('Не менее 8 символов. При потере пароля доступ невозможен');
+  const confirm={unlock:'Открыть',protect:'Защитить',change:'Сохранить',remove:'Снять защиту'}[kind];
+  const markup='<div class="password-fields">'+fields.map(([key,label])=>'<label class="password-label" for="password-'+key+'">'+t(label)+'</label><div class="password-row"><input class="dialog-input" id="password-'+key+'" data-password="'+key+'" type="password" maxlength="1024" autocomplete="off" spellcheck="false" aria-label="'+t(label)+'"><button type="button" class="password-eye" data-password-eye="'+key+'" title="'+t('Показать пароль')+'" aria-label="'+t('Показать пароль')+'">'+privacyIcon('eye')+'</button></div>').join('')+'<div class="password-error" role="alert" hidden></div></div>';
+  refs.dialog.classList.add('password-open');refs.dialog.dataset.passwordMode=kind;
+  try{
+   const result=dialogBox({title,message,confirm,optionsHtml:markup});
+   if(error){const e=refs.dialogOptions.querySelector('.password-error');e.textContent=error;e.hidden=false;}
+   requestAnimationFrame(()=>refs.dialogOptions.querySelector('[data-password]')?.focus());
+   return await result;
+  }finally{refs.dialogOptions.querySelectorAll('[data-password]').forEach(x=>x.value='');refs.dialogOptions.textContent='';refs.dialog.classList.remove('password-open');delete refs.dialog.dataset.passwordMode;}
+ }
+ // The titlebar button and shortcut use the existing three protection actions.
+ // Unlock is always the existing password challenge, never a UI-only toggle.
+ async function toggleProjectLock(){
+  if(!api.isDesktop||!state||projectOperation||lockPending||!refs.dialog.hidden)return;
+  closeMenus();
+  if(state.locked)return protectionAction('unlock');
+  if(!state.encrypted)return protectionAction('protect');
+  return lockProjectNow();
+ }
+ // Conceal synchronously before the first async save. Do not clear the editor
+ // until its latest changes are committed and the encrypted store is closed.
+ async function lockProjectNow(){
+  if(!api.isDesktop||!state?.encrypted||state.locked||projectOperation||!refs.dialog.hidden)return;
+  closeMenus();refs.toolbar.hidden=true;refs.headingPopover.hidden=true;refs.colorPopover.hidden=true;
+  lockPending=true;lockFailed=false;updateProtectionUI();
+  await runProjectTask(async()=>{
+   try{
+    for(;;){
+     lockFailed=false;updateProtectionUI();
+     try{
+      if(await flush()){
+       const result=await api.lockProject();
+       syncProject(result.project);clearTimeout(toastTimer);refs.toast.hidden=true;refs.toast.textContent='';return;
+      }
+     }catch(error){console.error('Project lock failed:',error);}
+     // A failed write must not discard edits or unexpectedly reveal the note.
+     lockFailed=true;updateProtectionUI();
+     if(!await dialogBox({title:'Не удалось заблокировать проект',message:t('Повторите блокировку или нажмите «Отмена», чтобы вернуться к проекту'),confirm:'Повторить блокировку'}))return;
+    }
+   }finally{lockPending=false;lockFailed=false;updateProtectionUI();}
+  });
+ }
+ async function protectionAction(kind){
+ if(kind==='lock')return lockProjectNow();
+ return runProjectTask(async()=>{
+  if(!await flush())return;
+  if(kind==='unlock'){const boot=await api.bootstrap();await completeOpen(boot.pendingOpen);return;}
+  let error='';
+  for(;;){
+   const values=await passwordDialog(kind,'',error);
+   if(!values)return;
+   try{
+    const p=kind==='protect'?await api.protectProject(values.password):kind==='change'?await api.changePassword({current:values.current,password:values.password}):await api.removeProtection(values.current);
+    syncProject(p);toast(kind==='remove'?'Защита снята':kind==='change'?'Пароль изменен':'Проект защищен');return;
+   }catch(e){error=errorText(settings.language,e.message);}
+   finally{for(const k of Object.keys(values))values[k]='';}
+  }
+ });}
+ async function deleteNote(id){return runProjectTask(()=>deleteNoteTask(id));}
+ async function deleteNoteTask(id){
+  if(state.notes.find(n=>n.id===id)?.pinned)return;
   if(state.notes.length<2){toast('В проекте должна остаться хотя бы одна заметка');return;}
-  const note=state.notes.find(n=>n.id===id);const ok=await dialogBox({title:'Переместить в корзину?',message:settings.language==='en'?`“${displayNoteName(note.title)}” can be restored.`:`«${displayNoteName(note.title)}» можно будет восстановить.`,confirm:'В корзину'});
+  const note=state.notes.find(n=>n.id===id);const ok=await dialogBox({title:'Переместить в корзину?',message:settings.language==='en'?`“${displayNoteName(note.title)}” can be restored`:`«${displayNoteName(note.title)}» можно будет восстановить`,confirm:'В корзину'});
   if(!ok)return;if(!await flush())return;try{const project=await api.deleteNote(id);history?.drop(id);syncProject(project,true)}catch(e){report(e)}
  }
- async function renameNote(id){
+ async function renameNote(id){return runProjectTask(()=>renameNoteTask(id));}
+ async function renameNoteTask(id){
   const n=state.notes.find(v=>v.id===id);if(!n)return;
   if(id===state.activeId){refs.title.focus();refs.title.select();return;}
   const title=await dialogBox({title:'Переименовать заметку',input:n.title,confirm:'Сохранить'});
   if(title===null)return;
-  try{const updated=await api.updateNote({id,title:nameOrFallback(title),html:n.html});recordExternal(n,updated);n.title=updated.title;renderList()}catch(e){report(e)}
+  try{const updated=await api.updateNote({id,title:nameOrFallback(title),html:n.html});recordExternal(n,updated);n.title=updated.title;if(searchOpen)refreshSearchMatches();else renderList()}catch(e){report(e)}
  }
- async function moveNote(from,target,direction){
+ async function moveNote(from,target,direction){return runProjectTask(()=>moveNoteTask(from,target,direction));}
+ async function setNotePinned(id){
+  return runProjectTask(async()=>{
+   const n=state?.notes.find(n=>n.id===id);if(!n||!await flush())return;
+   const next=await api.setNotePinned(id,!n.pinned);
+   const byId=new Map(state.notes.map(n=>[n.id,n]));
+   // Preserve editor/undo/scroll state; only the committed order and pin metadata change.
+   state.notes=next.notes.map(n=>Object.assign(byId.get(n.id)||{},n,{pinned:!!n.pinned}));
+   if(searchOpen)refreshSearchMatches();else renderList();
+  });
+ }
+ function canMove(from,to){return from>=0&&to>=0&&to<state.notes.length&&from!==to&&!state.notes.slice(Math.min(from,to),Math.max(from,to)+1).some(n=>n.pinned);}
+ async function moveNoteTask(from,target,direction){
   if(!from)return;const ids=state.notes.map(n=>n.id),i=ids.indexOf(from),j=ids.indexOf(target);
   const to=typeof direction==='number'?i+direction:j;
-  if(i===-1||to<0||to>=ids.length||i===to)return;
+  if(!canMove(i,to))return;
   ids.splice(i,1);ids.splice(to,0,from);
-  state.notes.sort((a,b)=>ids.indexOf(a.id)-ids.indexOf(b.id));renderList();
-  try{await api.reorderNotes(ids)}catch(e){report(e)}
+  // Do not publish uncommitted ordering in the UI.
+  await api.reorderNotes(ids);
+  const byId=new Map(state.notes.map(n=>[n.id,n]));
+  state.notes=ids.map(id=>byId.get(id));if(searchOpen)refreshSearchMatches();else renderList();
  }
  function closeMenus(){refs.appMenu.hidden=true;refs.submenu.hidden=true;refs.context.hidden=true;refs.headingPopover.hidden=true;refs.colorPopover.hidden=true;refs.menuToggle.setAttribute('aria-expanded','false')}
- function toggleAppMenu(){const wasOpen=!refs.appMenu.hidden;closeMenus();refs.appMenu.hidden=wasOpen;refs.menuToggle.setAttribute('aria-expanded',String(!wasOpen));}
+ function toggleAppMenu(){if(lockPending)return;const wasOpen=!refs.appMenu.hidden;closeMenus();refs.appMenu.hidden=wasOpen;refs.menuToggle.setAttribute('aria-expanded',String(!wasOpen));}
  async function showSubmenu(type){
   refs.submenu.textContent='';
   const add=(label,click)=>{
@@ -357,11 +548,15 @@
    b.title=label;
    const span=document.createElement('span');span.className='submenu-label';span.textContent=label;
    b.appendChild(span);
-   b.addEventListener('click',()=>{closeMenus();void click()});
+    b.addEventListener('click',()=>{closeMenus();void click()});
    refs.submenu.appendChild(b);
   };
-  if(type==='export'){
-   add(t('Обычный текст (.txt)'),()=>exportNote('txt'));
+  if(type==='protection'){
+    if(state?.locked)add(t('Разблокировать'),()=>protectionAction('unlock'));
+    else if(state?.encrypted){add(t('Заблокировать'),()=>protectionAction('lock'));add(t('Изменить пароль'),()=>protectionAction('change'));add(t('Удалить пароль'),()=>protectionAction('remove'));}
+    else add(t('Установить пароль'),()=>protectionAction('protect'));
+   }else if(type==='export'){
+    add(t('Обычный текст (.txt)'),()=>exportNote('txt'));
    add('HTML (.html)',()=>exportNote('html'));
    add('Markdown (.md)',()=>exportNote('md'));
   }else{
@@ -382,34 +577,51 @@
   const menu=refs.appMenu.getBoundingClientRect();
   const row=anchor.getBoundingClientRect();
   const left=Math.round(menu.right-root.left+6);
-  const top=Math.round(row.top-root.top-4);
+  let top=Math.round(row.top-root.top-4);
   const roomRight=Math.floor(root.right-(root.left+left)-12);
   refs.submenu.style.left=left+'px';
   refs.submenu.style.top=top+'px';
   refs.submenu.style.maxWidth=Math.max(104,Math.min(460,roomRight))+'px';
   refs.submenu.style.maxHeight=Math.max(120,Math.floor(root.bottom-row.top)-16)+'px';
   refs.submenu.hidden=false;
- }
- async function doAction(action){
-  if(action==='recent'||action==='export'){await showSubmenu(action);return}
+   if(type==='protection'){top=Math.max(6,Math.min(top,root.height-refs.submenu.offsetHeight-8));refs.submenu.style.top=top+'px';}
+  }
+  async function doAction(action){
+   if(lockPending)return;
+   if(state?.locked&&['save','save-as','export','trash'].includes(action))return;
+   if(action==='recent'||action==='export'||action==='protection'){await showSubmenu(action);return}
   closeMenus();
   if(action==='new-project')await newProject();if(action==='open-project')await openProject();
   if(action==='save')await saveProject();if(action==='save-as')await saveAs();
   if(action==='trash')await trashDialog();if(action==='settings')await settingsDialog();if(action==='about'){
    refs.dialog.classList.add('about-open');
-   try{await dialogBox({title:'Nocturne Notes',optionsHtml:'<div class="about-identity"><img class="about-logo" src="assets/nocturne-notes-logo.png" alt="Логотип Nocturne Notes"><div class="about-details"><div class="about-product">Nocturne Notes</div><div class="about-version">Версия 2.0.0</div></div></div>',hideCancel:true,confirm:'Закрыть'});}
+   try{await dialogBox({title:'Nocturne Notes',optionsHtml:'<div class="about-identity"><img class="about-logo" src="assets/nocturne-notes-logo.png" alt="Логотип Nocturne Notes"><div class="about-details"><div class="about-product">Nocturne Notes</div><div class="about-version">Версия 2.5.0</div></div></div>',hideCancel:true,confirm:'Закрыть'});}
    finally{refs.dialog.classList.remove('about-open');}
   }
  }
- function openContext(id,x,y){closeMenus();activeContextId=id;const bounds=refs.win.getBoundingClientRect();refs.context.hidden=false;refs.context.style.left=Math.max(6,Math.min(x-bounds.left,bounds.width-refs.context.offsetWidth-6))+'px';refs.context.style.top=Math.max(6,Math.min(y-bounds.top,bounds.height-refs.context.offsetHeight-6))+'px';}
+ function openContext(id,x,y){closeMenus();activeContextId=id;
+  const index=state.notes.findIndex(n=>n.id===id),note=state.notes[index];if(!note)return;
+  const pin=refs.context.querySelector('[data-note-action="pin-note"]');
+  pin.querySelector('span').textContent=t(note.pinned?'Открепить':'Закрепить');
+  refs.context.querySelector('[data-note-action="move-up"]').disabled=!!note.pinned||state.notes[index-1]?.pinned===true;
+  refs.context.querySelector('[data-note-action="move-down"]').disabled=!!note.pinned||state.notes[index+1]?.pinned===true;
+  refs.context.querySelector('[data-note-action="delete"]').disabled=!!note.pinned;
+  const bounds=refs.win.getBoundingClientRect();
+  refs.context.style.maxWidth=Math.max(0,Math.floor(bounds.width)-12)+'px';
+  refs.context.style.maxHeight=Math.max(0,Math.floor(bounds.height)-12)+'px';
+  refs.context.hidden=false;
+  refs.context.style.left=Math.max(6,Math.min(x-bounds.left,bounds.width-refs.context.offsetWidth-6))+'px';
+  refs.context.style.top=Math.max(6,Math.min(y-bounds.top,bounds.height-refs.context.offsetHeight-6))+'px';
+ }
  function openSearch(focusReplacement=false){
-  if(focusMode)toggleFocus(false);
+   if(state?.locked)return;
+   if(focusMode)toggleFocus(false);
   if(!searchOpen){
    updateLocalNote();
    searchOpen=true;refs.searchPanel.hidden=false;refs.sidebar.classList.add('searching');
    refs.searchToggle.setAttribute('aria-expanded','true');
    if(refs.sidebar.classList.contains('collapsed'))toggleSidebar(false);
-   syncSidebarWidth();renderList();
+   syncSidebarWidth();
   }
   refreshSearchMatches();
   const field=focusReplacement?refs.searchReplacement:refs.searchQuery;
@@ -423,26 +635,49 @@
   searchOpen=false;refs.searchPanel.hidden=true;refs.sidebar.classList.remove('searching');
   refs.searchToggle.setAttribute('aria-expanded','false');
   refs.searchQuery.value='';refs.searchReplacement.value='';
-  searchHits=[];searchCursor=-1;clearSearchHighlights();
+  searchHits={groups:[],length:0};searchCursor=-1;clearSearchHighlights();
   refs.searchNavigation.hidden=true;
   syncSidebarWidth();renderList();
  }
  function searchResultNodes(){
   const q=refs.searchQuery.value.trim();if(!q||!state)return [];
-  return state.notes.filter(n=>(searchScope==='project'||n.id===state.activeId)&&window.nocturneSearch.countMatches(n,q)>0);
+  const ids=new Set(searchHits.groups.map(g=>g.noteId));
+  return state.notes.filter(n=>ids.has(n.id));
  }
- const searchHitKey=hit=>hit?`${hit.noteId}|${hit.kind}|${hit.offset}`:'';
+ // Store offsets in compact per-note groups rather than one object per match.
  function getSearchHits(){
-  const q=refs.searchQuery.value.trim();if(!searchOpen||!q||!state)return [];
-  const found=[];
+  const q=refs.searchQuery.value.trim(),groups=[];let length=0;
+  if(!searchOpen||!q||!state)return {groups,length};
+  const add=(noteId,kind,positions)=>{
+   if(!positions.length)return;
+   groups.push({noteId,kind,start:length,offsets:Uint32Array.from(positions)});
+   length+=positions.length;
+  };
   for(const n of state.notes){
    if(searchScope==='note'&&n.id!==state.activeId)continue;
-   for(const position of window.nocturneSearch.hits(n.title||'',q))found.push({noteId:n.id,kind:'title',offset:position});
-   const root=document.createElement('div');root.innerHTML=n.html||'';
-   const body=window.nocturneSearch.findInElement(root,q);
-   for(const position of body.positions)found.push({noteId:n.id,kind:'body',offset:position});
+   add(n.id,'title',window.nocturneSearch.hits(n.title||'',q));
+   add(n.id,'body',window.nocturneSearch.bodyHits(n,q));
   }
-  return found;
+  return {groups,length};
+ }
+ function searchHitAt(index){
+  if(index<0||index>=searchHits.length)return null;
+  let lo=0,hi=searchHits.groups.length-1;
+  while(lo<=hi){
+   const mid=(lo+hi)>>>1,g=searchHits.groups[mid];
+   if(index<g.start)hi=mid-1;
+   else if(index>=g.start+g.offsets.length)lo=mid+1;
+   else return {noteId:g.noteId,kind:g.kind,offset:g.offsets[index-g.start]};
+  }
+  return null;
+ }
+ function previousSearchIndex(hit){
+  if(!hit)return -1;
+  const g=searchHits.groups.find(g=>g.noteId===hit.noteId&&g.kind===hit.kind);
+  if(!g)return -1;
+  let lo=0,hi=g.offsets.length-1;
+  while(lo<=hi){const mid=(lo+hi)>>>1,x=g.offsets[mid];if(x===hit.offset)return g.start+mid;if(x<hit.offset)lo=mid+1;else hi=mid-1;}
+  return -1;
  }
  function updateSearchCounter(){
   const hasText=searchOpen&&!!refs.searchQuery.value.trim();
@@ -452,19 +687,19 @@
   refs.searchReplaceOne.disabled=refs.searchReplaceAll.disabled=!searchHits.length;
  }
  function refreshSearchMatches({preferNoteId,preferredIndex}={}){
-  const old=searchHitKey(searchHits[searchCursor]);
+  const old=searchHitAt(searchCursor);
   searchHits=getSearchHits();
   if(!searchHits.length)searchCursor=-1;
   else if(Number.isInteger(preferredIndex))searchCursor=Math.min(Math.max(preferredIndex,0),searchHits.length-1);
-  else if(preferNoteId){const idx=searchHits.findIndex(hit=>hit.noteId===preferNoteId);searchCursor=idx>=0?idx:0;}
-  else{const idx=searchHits.findIndex(hit=>searchHitKey(hit)===old);searchCursor=idx>=0?idx:Math.min(Math.max(searchCursor,0),searchHits.length-1);}
-  updateSearchCounter();paintSearchHits(false);
+  else if(preferNoteId){const group=searchHits.groups.find(g=>g.noteId===preferNoteId);searchCursor=group?.start??0;}
+  else{const idx=previousSearchIndex(old);searchCursor=idx>=0?idx:Math.min(Math.max(searchCursor,0),searchHits.length-1);}
+  updateSearchCounter();renderList();paintSearchHits(false);
  }
  function paintSearchHits(scroll){
   clearSearchHighlights();
   if(!searchOpen||!refs.searchQuery.value.trim()||!state)return;
-  const current=searchHits[searchCursor];
-  const ranges=window.nocturneSearch.rangesFor(refs.editor,refs.searchQuery.value.trim());
+  const current=searchHitAt(searchCursor);
+  const ranges=window.nocturneSearch.rangesFor(refs.editor,refs.searchQuery.value.trim(),current?.noteId===state.activeId&&current.kind==='body'?current.offset:null);
   if(typeof CSS!=='undefined'&&CSS.highlights&&typeof Highlight!=='undefined'){
    CSS.highlights.set('nocturne-search-all',new Highlight(...ranges.map(hit=>hit.range)));
    const chosen=current?.noteId===state.activeId&&current?.kind==='body'?ranges.find(hit=>hit.offset===current.offset):null;
@@ -492,44 +727,53 @@
    }
   }
  }
- async function showCurrentSearchHit(scroll=false){
-  const chosen=searchHits[searchCursor];
+ async function showCurrentSearchHit(scroll=false,withinOperation=false){
+  const chosen=searchHitAt(searchCursor);
   if(!chosen){paintSearchHits(false);return;}
-  if(chosen.noteId!==state.activeId){await selectNote(chosen.noteId);}
+  if(chosen.noteId!==state.activeId){await (withinOperation?switchNote(chosen.noteId):selectNote(chosen.noteId));}
   updateSearchCounter();paintSearchHits(scroll);
  }
- async function navigateSearch(direction){
+ async function navigateSearch(direction){return runProjectTask(async()=>{
   refreshSearchMatches();if(!searchHits.length)return;
   searchCursor=(searchCursor+direction+searchHits.length)%searchHits.length;
-  await showCurrentSearchHit(true);
- }
- async function replaceSearchMatches(all){
+  await showCurrentSearchHit(true,true);
+ });}
+ async function replaceSearchMatches(all){return runProjectTask(()=>replaceSearchMatchesTask(all));}
+ async function replaceSearchMatchesTask(all){
   const query=refs.searchQuery.value.trim(),value=refs.searchReplacement.value;
   if(!query){refs.searchQuery.focus();return;}
   if(!await flush())return;
   refreshSearchMatches();
   if(!searchHits.length){toast('Совпадений нет');return;}
   const previousIndex=searchCursor;
-  const targets=all?searchResultNodes():[state.notes.find(n=>n.id===searchHits[searchCursor].noteId)];
-  let changed=0;
+  const targets=all?searchResultNodes():[state.notes.find(n=>n.id===searchHitAt(searchCursor).noteId)];
+  let changed=0;const batch=[];
   for(const n of targets){
    if(!n)continue;
-   const chosen=all?null:searchHits[searchCursor];
+   const chosen=all?null:searchHitAt(searchCursor);
    const updated=all?window.nocturneSearch.replaceInNote(n,query,value,true):window.nocturneSearch.replaceAt(n,query,value,chosen.kind,chosen.offset);
    if(!updated.count)continue;
-   if(updated.title.length>250||updated.html.length>5_000_000){toast('Результат замены слишком длинный');return;}
-   try{
-    const saved=await api.updateNote({id:n.id,title:updated.title,html:sanitizeHTML(updated.html)});
-    recordExternal(n,saved);Object.assign(n,saved);changed+=updated.count;markStatus(n.id,'saved');
-   }catch(error){markStatus(n.id,'error');report(error);return;}
+   const html=sanitizeHTML(updated.html);
+   if(updated.title.length>250||html.length>5_000_000){toast('Результат замены слишком длинный');return;}
+   batch.push({id:n.id,title:updated.title,html});changed+=updated.count;
    if(!all)break;
   }
-  renderNote();renderList();
+  if(batch.length){
+   let saved;
+   try{saved=await api.updateNotes(batch);}catch(e){report(e);return;}
+   for(const row of saved){
+    const n=state.notes.find(v=>v.id===row.id);
+    recordExternal(n,row);Object.assign(n,row);window.nocturneSearch.invalidate(n.id);markStatus(n.id,'saved');
+   }
+  }
+  renderNote();
   refreshSearchMatches({preferredIndex:all?0:previousIndex});
-  if(!all)await showCurrentSearchHit(true);
+  if(!all)await showCurrentSearchHit(true,true);
   toast(changed?(t('Заменено: ')+changed):'Совпадений нет');
  }
- function toggleSidebar(force){const collapsed=typeof force==='boolean'?force:!refs.sidebar.classList.contains('collapsed');refs.sidebar.classList.toggle('collapsed',collapsed);refs.sidebarTab.title=t(collapsed?'Показать список заметок':'Скрыть список заметок');refs.sidebarTab.setAttribute('aria-label',refs.sidebarTab.title);void api.setSidebarCollapsed(collapsed);}
+ let sidebarSaved=false,sidebarRequest=0;
+ function applySidebarCollapsed(collapsed){refs.sidebar.classList.toggle('collapsed',collapsed);refs.sidebarTab.title=t(collapsed?'Показать список заметок':'Скрыть список заметок');refs.sidebarTab.setAttribute('aria-label',refs.sidebarTab.title);}
+ function toggleSidebar(force){const collapsed=typeof force==='boolean'?force:!refs.sidebar.classList.contains('collapsed'),request=++sidebarRequest;applySidebarCollapsed(collapsed);void api.setSidebarCollapsed(collapsed).then(()=>{sidebarSaved=collapsed;}).catch(e=>{if(request===sidebarRequest)applySidebarCollapsed(sidebarSaved);report(e);});}
  // Keep the active editing line above a real bottom gutter while typing.
  // Browser-native caret auto-scrolling only makes the caret barely visible and
  // does not respect the container's padding-bottom, causing the observed <5px gap.
@@ -574,6 +818,7 @@
  }
  function selectionInsideEditor(){const s=window.getSelection();if(!s||s.isCollapsed||s.rangeCount===0)return null;if(!refs.editor.contains(s.anchorNode)||!refs.editor.contains(s.focusNode))return null;return s.getRangeAt(0)}
  function adjustToolbar(){
+  if(lockPending||state?.locked){refs.toolbar.hidden=true;refs.headingPopover.hidden=true;refs.colorPopover.hidden=true;return;}
   if(!settings.formatToolbarEnabled||searchOpen){refs.toolbar.hidden=true;refs.headingPopover.hidden=true;refs.colorPopover.hidden=true;return;}
   const range=selectionInsideEditor();if(!range){refs.toolbar.hidden=true;refs.headingPopover.hidden=true;refs.colorPopover.hidden=true;return}
   if(!formatPopoversReady){fillFormatPopovers();formatPopoversReady=true;}
@@ -599,6 +844,12 @@
   }
  }
  function restoreRange(){if(!preservedRange)return;const sel=window.getSelection();sel.removeAllRanges();sel.addRange(preservedRange);refs.editor.focus({preventScroll:true})}
+ function editorCommand(command,value=null){
+  if(projectOperation||state?.locked)return false;
+  commitHistory();if(state?.activeId)history?.resetCurrent(state.activeId,editSnapshot());
+  const result=document.execCommand(command,false,value);
+  queueSave();return result;
+ }
  async function formatAction(cmd){
   if(cmd==='color'||cmd==='heading'){
    const pop=cmd==='color'?refs.colorPopover:refs.headingPopover;
@@ -622,26 +873,61 @@
    const url=await dialogBox({title:'Добавить ссылку',message:t(s?'Ссылка для выделенного текста:':'Введите адрес ссылки:'),input:'https://',confirm:'Добавить'});
    if(!url)return;
    if(!/^(https?:\/\/|mailto:)/i.test(url)){toast('Нужна ссылка с https://, http:// или mailto:');return}
-   restoreRange();commitHistory();if(state?.activeId)history?.resetCurrent(state.activeId,editSnapshot());document.execCommand('createLink',false,url);queueSave();setTimeout(adjustToolbar,15);return;
+   restoreRange();editorCommand('createLink',url);setTimeout(adjustToolbar,15);return;
   }
-  restoreRange();commitHistory();if(state?.activeId)history?.resetCurrent(state.activeId,editSnapshot());
+  restoreRange();
   try {
-   document.execCommand(cmd,false,null);
-   queueSave();requestAnimationFrame(adjustToolbar);
+   editorCommand(cmd);requestAnimationFrame(adjustToolbar);
   }catch(e){report(e)}
  }
- function dialogBox({title,message='',input,confirm='Готово',hideCancel=false,optionsHtml=''}){
+ async function askDraftDecision({token}){
+  const ownsOperation=!projectOperation;
+  let choice='cancel';
+  if(ownsOperation){commitHistory();projectOperation=true;updateProtectionUI();}
+  try{
+   if(!refs.dialog.hidden||!await flush())return;
+   closeMenus();refs.dialog.classList.add('draft-open');
+   let decision;
+   try{decision=await dialogBox({title:'Сохранить проект?',message:t('Проект не сохранен. При закрытии несохраненные данные будут потеряны'),confirm:'Сохранить',discard:true});}
+   finally{refs.dialog.classList.remove('draft-open');}
+   if(decision==='discard'){choice='discard';return;}
+   if(!decision)return;
+   if(state?.locked){const boot=await api.bootstrap();if(!await completeOpen(boot.pendingOpen))return;}
+   const saved=await api.saveAsProject();
+   if(saved?.notes&&!saved.isDraft){syncProject(saved,true);choice='save';}
+  }catch(e){report(e);}
+  finally{
+   try{await api.respondDraft({token,choice});}catch(e){report(e);}
+   if(ownsOperation){projectOperation=false;updateProtectionUI();void drainExternal();}
+  }
+ }
+ function dialogBox({title,message='',input,confirm='Готово',hideCancel=false,optionsHtml='',discard=false}){
   refs.dialogHeading.textContent=t(title);refs.dialogMessage.textContent=message;
   refs.dialogInput.hidden=input===undefined;refs.dialogInput.value=input??'';
   refs.dialogOptions.hidden=!optionsHtml;refs.dialogOptions.innerHTML=optionsHtml;localizeTree(refs.dialogOptions);
-  refs.dialogCancel.hidden=hideCancel;refs.dialogConfirm.textContent=t(confirm);refs.dialog.hidden=false;
+  refs.dialogCancel.hidden=hideCancel;refs.dialogConfirm.textContent=t(confirm);
+  $('#dialog-discard')?.remove();
+  if(discard){const button=document.createElement('button');button.type='button';button.id='dialog-discard';button.textContent=t('Не сохранять');button.addEventListener('click',()=>resolveDialog('discard'));refs.dialogConfirm.before(button);}
+  refs.dialog.hidden=false;
   return new Promise(resolve=>{dialogResolve=resolve;requestAnimationFrame(()=>{(input===undefined?refs.dialogConfirm:refs.dialogInput).focus();if(input!==undefined)refs.dialogInput.select()})});
  }
  function resolveDialog(ok){
   if(refs.dialog.hidden)return;
-  const cb=dialogResolve;dialogResolve=null;
-  const value=ok?(refs.dialogInput.hidden?true:refs.dialogInput.value):null;
-  refs.dialog.hidden=true;if(cb)cb(value);
+  let value=ok==='discard'&&refs.dialog.classList.contains('draft-open')?'discard':ok?(refs.dialogInput.hidden?true:refs.dialogInput.value):null;
+  if(refs.dialog.dataset.passwordMode){
+   const fields=[...refs.dialogOptions.querySelectorAll('[data-password]')];
+   if(ok){
+    value=Object.fromEntries(fields.map(el=>[el.dataset.password,el.value]));
+    let message='';
+    if(fields.some(el=>!el.value))message='Введите пароль';
+    else if(value.password&&[...value.password].length<8)message='Не менее 8 символов';
+    else if(value.password!==undefined&&value.password!==value.repeat)message='Пароли не совпадают';
+    if(message){const e=refs.dialogOptions.querySelector('.password-error');e.textContent=t(message);e.hidden=false;return;}
+   }
+   fields.forEach(el=>{el.value='';el.type='password';});
+  }
+  const cb=dialogResolve;dialogResolve=null;refs.dialog.hidden=true;$('#dialog-discard')?.remove();if(cb)cb(value);
+  queueMicrotask(()=>void drainExternal());
  }
  function customSelect(id,selected,items){
   const current=items.find(([value])=>String(value)===String(selected))||items[0];
@@ -680,13 +966,18 @@
    const step=e.target.closest('[data-font-step]');
    if(step){const input=$('#'+step.dataset.target);input.value=Math.max(Number(input.min),Math.min(Number(input.max),Number(input.value)+Number(step.dataset.fontStep)*Number(input.step)));input.dispatchEvent(new Event('input',{bubbles:true}));return;}
   });
-  refs.dialogOptions.addEventListener('input',e=>{if(e.target.matches('input[type=range]')){const readout=$('#'+e.target.id+'-value');if(readout)readout.textContent=e.target.id==='setting-line'?Number(e.target.value).toFixed(2):e.target.value+' px';}});
+  refs.dialogOptions.addEventListener('input',e=>{if(e.target.matches('input[type=range]')){const readout=$('#'+e.target.id+'-value');if(readout)readout.textContent=rangeReadout(e.target.id,e.target.value);if(e.target.id==='setting-autosave')e.target.setAttribute('aria-valuetext',rangeReadout(e.target.id,e.target.value));}});
+ }
+ function rangeReadout(id,value){
+  if(id==='setting-line')return Number(value).toFixed(2);
+  if(id==='setting-autosave')return value+' '+t('мин');
+  return value+' px';
  }
  async function settingsDialog(){
-  const range=(id,label,desc,min,max,step,value)=>`<div class="setting-row font-setting"><span class="setting-copy"><strong>${label}</strong><small>${desc}</small></span><div class="font-controls"><button type="button" class="font-step" data-target="${id}" data-font-step="-1" aria-label="Уменьшить: ${label}"><svg><use href="#i-minus"/></svg></button><input id="${id}" type="range" min="${min}" max="${max}" step="${step}" value="${value}" aria-label="${label}"><button type="button" class="font-step" data-target="${id}" data-font-step="1" aria-label="Увеличить: ${label}"><svg><use href="#i-plus"/></svg></button><span class="font-readout" id="${id}-value">${id==='setting-line'?Number(value).toFixed(2):value+' px'}</span></div></div>`;
+  const range=(id,label,desc,min,max,step,value)=>`<div class="setting-row font-setting"><span class="setting-copy"><strong>${label}</strong><small>${desc}</small></span><div class="font-controls"><button type="button" class="font-step" data-target="${id}" data-font-step="-1" aria-label="Уменьшить: ${label}"><svg><use href="#i-minus"/></svg></button><input id="${id}" type="range" min="${min}" max="${max}" step="${step}" value="${value}" aria-label="${label}"><button type="button" class="font-step" data-target="${id}" data-font-step="1" aria-label="Увеличить: ${label}"><svg><use href="#i-plus"/></svg></button><span class="font-readout" id="${id}-value">${rangeReadout(id,value)}</span></div></div>`;
   const language=customSelect('setting-language',settings.language,[['en','Английский'],['ru','Русский']]);
   const font=customSelect('setting-editor-font',settings.editorFont,Object.entries(EDITOR_FONTS).map(([key,value])=>[key,value.label]));
-  const delay=customSelect('setting-autosave',settings.autosaveMs,[[60000,'1 минута'],[180000,'3 минуты'],[300000,'5 минут']]);
+  const delay=range('setting-autosave','Автосохранение','Пауза после последнего ввода',1,20,1,settings.autosaveMs/60000);
   const html=`
    <section class="settings-group"><div class="settings-caption">Редактор</div>
     <div class="setting-row editor-font-setting"><span class="setting-copy"><strong>Шрифт редактора</strong><small>Заголовок и текст заметки</small></span>${font}</div>
@@ -698,7 +989,7 @@
     <div class="setting-row"><span class="setting-copy"><strong>Проверка орфографии</strong><small>Русский и английский языки</small></span><input id="setting-spellcheck" type="checkbox" aria-label="Проверка орфографии" ${settings.spellcheckEnabled?'checked':''}></div>
    </section>
    <section class="settings-group"><div class="settings-caption">Сохранение</div>
-    <div class="setting-row"><span class="setting-copy"><strong>Автосохранение</strong><small>Пауза после последнего ввода</small></span>${delay}</div>
+    ${delay}
     <div class="setting-row"><span class="setting-copy"><strong>Восстанавливать последний проект</strong><small>Открывать прошлую сессию при запуске</small></span><input id="setting-restore" type="checkbox" aria-label="Восстанавливать последний проект" ${settings.restoreLastProject?'checked':''}></div>
    </section>
    <section class="settings-group"><div class="settings-caption">Приложение</div>
@@ -707,9 +998,11 @@
    </section>`;
   refs.dialog.classList.add('settings-open');
   try{
-   const accepted=await dialogBox({title:'Настройки',confirm:'Сохранить',optionsHtml:html});
+   const dialog=dialogBox({title:'Настройки',confirm:'Сохранить',optionsHtml:html});
+   $('#setting-autosave').setAttribute('aria-valuetext',rangeReadout('setting-autosave',$('#setting-autosave').value));
+   const accepted=await dialog;
    if(!accepted)return;
-   const next={language:$('#setting-language').value,minimizeToTray:$('#setting-tray').checked,editorFont:$('#setting-editor-font').value,fontSize:Number($('#setting-font').value),titleSize:Number($('#setting-title-size').value),lineHeight:Number($('#setting-line').value),autosaveMs:Number($('#setting-autosave').value),restoreLastProject:$('#setting-restore').checked,sidebarWidth:settings.sidebarWidth,formatToolbarEnabled:$('#setting-toolbar').checked,saveIndicatorsEnabled:$('#setting-indicators').checked,spellcheckEnabled:$('#setting-spellcheck').checked};
+   const next={language:$('#setting-language').value,minimizeToTray:$('#setting-tray').checked,editorFont:$('#setting-editor-font').value,fontSize:Number($('#setting-font').value),titleSize:Number($('#setting-title-size').value),lineHeight:Number($('#setting-line').value),autosaveMs:Number($('#setting-autosave').value)*60000,restoreLastProject:$('#setting-restore').checked,sidebarWidth:settings.sidebarWidth,formatToolbarEnabled:$('#setting-toolbar').checked,saveIndicatorsEnabled:$('#setting-indicators').checked,spellcheckEnabled:$('#setting-spellcheck').checked};
    const previousLanguage=settings.language;
    settings={...DEFAULT_SETTINGS,...await api.updateSettings(next)};
    applySettings();
@@ -769,6 +1062,8 @@
   const ctrl=e.ctrlKey||e.metaKey, shift=e.shiftKey;
   if(e.key==='Escape'){if(!refs.dialog.hidden){resolveDialog(false);e.preventDefault();return}if(searchOpen){e.preventDefault();closeSearch();return;}if(focusMode){e.preventDefault();toggleFocus(false);return;}closeMenus();return;}
   if(!refs.dialog.hidden||e.isComposing)return;
+  if(api.isDesktop&&ctrl&&shift&&e.code==='KeyL'){e.preventDefault();if(!e.repeat)void toggleProjectLock();return;}
+  if(projectOperation){if(e.ctrlKey||e.metaKey||e.key==='F2')e.preventDefault();return;}
   if(e.key==='F11'){e.preventDefault();toggleFocus();return;}
   if(api.isDesktop&&ctrl&&shift&&e.code==='KeyT'){e.preventDefault();void toggleTop();return;}
   if(ctrl&&(e.code==='KeyZ'||e.code==='KeyY')&&(e.target===refs.title||refs.editor.contains(e.target)||e.target===document.body)){e.preventDefault();applyHistory(e.code==='KeyY'||shift?'redo':'undo');return;}
@@ -781,10 +1076,12 @@
   if(e.key==='Alt'&&!ctrl&&!shift){e.preventDefault();toggleAppMenu()}
  }
  function bind(){
+  bindNoteList();
   refs.menuToggle.addEventListener('click',e=>{e.stopPropagation();toggleAppMenu()});
   refs.appMenu.addEventListener('click',e=>{const b=e.target.closest('[data-action]');if(b)void doAction(b.dataset.action)});
   refs.context.addEventListener('click',e=>{
-   const b=e.target.closest('[data-note-action]');if(!b)return;const action=b.dataset.noteAction,id=activeContextId;closeMenus();
+   const b=e.target.closest('[data-note-action]');if(!b||b.disabled)return;const action=b.dataset.noteAction,id=activeContextId;closeMenus();
+   if(action==='pin-note')void setNotePinned(id);
    if(action==='duplicate')void duplicateNote(id);if(action==='rename')void renameNote(id);if(action==='delete')void deleteNote(id);
    if(action==='move-up')void moveNote(id,id,-1);if(action==='move-down')void moveNote(id,id,1);
   });
@@ -802,10 +1099,10 @@
     b.classList.toggle('selected',selected);
     b.setAttribute('aria-pressed',String(selected));
    });
-   refreshSearchMatches({preferredIndex:0});renderList();
+   refreshSearchMatches({preferredIndex:0});
   }));
   $('#search-close').addEventListener('click',closeSearch);
-  refs.searchQuery.addEventListener('input',()=>{refreshSearchMatches({preferredIndex:0});renderList();});
+  refs.searchQuery.addEventListener('input',()=>{refreshSearchMatches({preferredIndex:0});});
   refs.searchQuery.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();void navigateSearch(e.shiftKey?-1:1)}});
   refs.searchPrevious.addEventListener('click',()=>void navigateSearch(-1));
   refs.searchNext.addEventListener('click',()=>void navigateSearch(1));
@@ -813,11 +1110,11 @@
   refs.searchReplaceOne.addEventListener('click',()=>void replaceSearchMatches(false));
   refs.searchReplaceAll.addEventListener('click',()=>void replaceSearchMatches(true));
   refs.sidebarTab.addEventListener('click',()=>toggleSidebar());
-  for(const field of [refs.title,refs.editor])field.addEventListener('beforeinput',beforeEdit);
+  for(const field of [refs.title,refs.editor])field.addEventListener('beforeinput',e=>{if(projectOperation||state?.locked){if(e.cancelable)e.preventDefault();return;}beforeEdit(e);});
   api.onEditHistory?.(dir=>{if(document.activeElement===refs.title||refs.editor.contains(document.activeElement))applyHistory(dir);else document.execCommand(dir);});
   refs.title.addEventListener('input',()=>{
    queueSave();
-   if(searchOpen){refreshSearchMatches();renderList();return;}
+   if(searchOpen){refreshSearchMatches();return;}
    const row=refs.list.querySelector('.note-row.active'),n=readNote();
    if(row&&n){row.title=displayNoteName(n.title);row.querySelector('.note-row-label').textContent=displayNoteName(n.title);}
   });
@@ -845,7 +1142,7 @@
    });
   });
   refs.editor.addEventListener('input',()=>{queueSave();if(searchOpen)refreshSearchMatches();scheduleCaretBottomInset();});
-  refs.editor.addEventListener('paste',e=>{e.preventDefault();commitHistory();if(state?.activeId)history?.resetCurrent(state.activeId,editSnapshot());const plain=e.clipboardData?.getData('text/plain')||'';document.execCommand('insertText',false,plain)});
+  refs.editor.addEventListener('paste',e=>{e.preventDefault();if(projectOperation||state?.locked)return;commitHistory();if(state?.activeId)history?.resetCurrent(state.activeId,editSnapshot());const plain=e.clipboardData?.getData('text/plain')||'';document.execCommand('insertText',false,plain)});
   refs.editor.addEventListener('click',e=>{
    const a=e.target.closest('a[href]');if(a && (e.ctrlKey||e.metaKey)){e.preventDefault();window.open(a.href,'_blank','noopener,noreferrer')}
   });
@@ -855,12 +1152,18 @@
   refs.toolbar.addEventListener('pointerdown',e=>{if(e.target.closest('button'))e.preventDefault()});
   refs.toolbar.addEventListener('click',e=>{const b=e.target.closest('[data-format]');if(b)void formatAction(b.dataset.format)});
   refs.colorPopover.addEventListener('pointerdown',e=>e.preventDefault());
-  const chooseHeading=b=>{restoreRange();commitHistory();if(state?.activeId)history?.resetCurrent(state.activeId,editSnapshot());document.execCommand('formatBlock',false,'<'+b.dataset.heading+'>');refs.headingPopover.hidden=true;$('#heading-toggle').setAttribute('aria-expanded','false');queueSave();requestAnimationFrame(adjustToolbar)};
+  const chooseHeading=b=>{restoreRange();editorCommand('formatBlock','<'+b.dataset.heading+'>');refs.headingPopover.hidden=true;$('#heading-toggle').setAttribute('aria-expanded','false');queueSave();requestAnimationFrame(adjustToolbar)};
   refs.headingPopover.addEventListener('pointerdown',e=>{const b=e.target.closest('[data-heading]');e.preventDefault();if(b)chooseHeading(b)});
   refs.headingPopover.addEventListener('click',e=>{const b=e.target.closest('[data-heading]');if(b&&e.detail===0)chooseHeading(b)});
-  refs.colorPopover.addEventListener('click',e=>{const b=e.target.closest('[data-color]');if(!b)return;restoreRange();commitHistory();if(state?.activeId)history?.resetCurrent(state.activeId,editSnapshot());document.execCommand('foreColor',false,b.dataset.color);refs.colorPopover.hidden=true;queueSave();adjustToolbar()});
+  refs.colorPopover.addEventListener('click',e=>{const b=e.target.closest('[data-color]');if(!b)return;restoreRange();editorCommand('foreColor',b.dataset.color);refs.colorPopover.hidden=true;queueSave();adjustToolbar()});
   refs.dialogCancel.addEventListener('click',()=>resolveDialog(false));refs.dialogConfirm.addEventListener('click',()=>resolveDialog(true));
   refs.dialogInput.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();resolveDialog(true)}});
+  refs.dialogOptions.addEventListener('keydown',e=>{if(e.target.matches('[data-password]')&&e.key==='Enter'){e.preventDefault();resolveDialog(true);}});
+  refs.dialogOptions.addEventListener('click',e=>{
+   const b=e.target.closest('[data-password-eye]');if(!b)return;
+   const field=refs.dialogOptions.querySelector('#password-'+b.dataset.passwordEye);if(!field)return;
+   const show=field.type==='password';field.type=show?'text':'password';b.innerHTML=privacyIcon(show?'eyeOff':'eye');b.title=t(show?'Скрыть пароль':'Показать пароль');b.setAttribute('aria-label',b.title);field.focus();
+  });
   refs.dialog.addEventListener('pointerdown',e=>{if(e.target===refs.dialog)resolveDialog(false)});
   document.addEventListener('pointerdown',e=>{if(!e.target.closest('.glass-select'))refs.dialogOptions.querySelectorAll('.glass-select-list').forEach(el=>el.hidden=true)});
   settingsControlEvents();resizeSidebar();
@@ -871,13 +1174,16 @@
   window.addEventListener('blur',()=>{if(state)void flush()});
   $('#min-btn').addEventListener('click',async()=>{const x=await api.windowAction('minimize');if(x?.previewMessage)toast(x.previewMessage)});
   $('#max-btn').addEventListener('click',async()=>{const x=await api.windowAction('maximize');if(x?.previewMessage)toast(x.previewMessage)});
-  $('#close-btn').addEventListener('click',async()=>{if(!await flush())return;const x=await api.windowAction('close');if(x?.previewMessage)toast(x.previewMessage)});
-  api.onBeforeClose(async()=>{let ok=false;try{ok=await flush();}catch(error){report(error);}finally{api.closeConfirmed(ok);}});
+  $('#close-btn').addEventListener('click',async()=>{if(projectOperation||!await flush())return;const x=await api.windowAction('close');if(x?.previewMessage)toast(x.previewMessage)});
+  api.onDraftDecision?.(request=>void askDraftDecision(request));
+  api.onBeforeClose(async()=>{if(projectOperation||!refs.dialog.hidden){api.closeConfirmed(false);return;}let ok=false;try{ok=await flush();}catch(error){report(error);}finally{api.closeConfirmed(ok);}});
+  api.onExternalOpen?.(()=>{externalWaiting=true;void drainExternal();});
   api.onWindowState(v=>{refs.win.classList.toggle('is-maximized',v);$('#max-btn').title=t(v?'Восстановить размер':'Развернуть');});
  }
  async function start(){
+  let pendingOpen=null;
   await featuresReady;history=new window.NocturneUndoBuffer();installFeatureUI();localizeTree(document.body,true);bind();
-  try{const boot=await api.bootstrap();settings={...DEFAULT_SETTINGS,...boot.settings};applyLanguage();applySettings();syncProject(boot.project);if(boot.sidebarCollapsed)toggleSidebar(true)}
+  try{const boot=await api.bootstrap();settings={...DEFAULT_SETTINGS,...boot.settings};applyLanguage();applySettings();syncProject(boot.project);sidebarSaved=!!boot.sidebarCollapsed;applySidebarCollapsed(sidebarSaved);pendingOpen=boot.pendingOpen||null;}
   catch(e){report(e);refs.title.value=t('Ошибка загрузки');refs.editor.textContent=errorText(settings.language,e.message)}
   if(!api.isDesktop){toast('Интерактивная версия в браузере · проекты .ns — в Windows-приложении')}
   if(api.isDesktop&&typeof api.notifyUIReady==='function'){
@@ -890,6 +1196,7 @@
    // Hidden renderers may throttle animation frames; ensure no invisible window.
    setTimeout(announce,200);
   }
+  if(pendingOpen)void runProjectTask(()=>completeOpen(pendingOpen));
  }
  void start();
 })();

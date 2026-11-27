@@ -18,7 +18,7 @@
    const bytes=()=>[...this.notes.values()].reduce((total,h)=>total+h.states.reduce((n,s)=>n+2*(s.title.length+s.html.length),0),0);
    while(bytes()>this.maxBytes){
     let changed=false;
-    for(const [id,h] of this.notes){if(id!==active){this.notes.delete(id);changed=true;break;}}
+    for(const id of this.notes.keys()){if(id!==active){this.notes.delete(id);changed=true;break;}}
     if(changed)continue;
     const h=this.notes.get(active);
     if(!h||h.states.length<=1)break;

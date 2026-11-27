@@ -1,8 +1,8 @@
 {
   "name": "nocturne-notes",
   "productName": "Nocturne Notes",
-  "version": "2.0.0",
-  "description": "Minimal dark glass note editor for Windows 11",
+  "version": "2.5.0",
+  "description": "Minimalist note editor",
   "main": "main.js",
   "author": "Nocturne Notes",
   "license": "MIT",
@@ -12,11 +12,24 @@
     "build:win": "electron-builder --win --x64 --publish never",
     "verify:visual": "node scripts/verify-ui-lock.js",
     "test:ui": "electron scripts/test-desktop-ui.js",
-    "bench:compare": "node scripts/compare-performance.js"
+    "bench:compare": "node scripts/compare-performance.js",
+    "check:types": "tsc --noEmit -p tsconfig.json",
+    "test:load": "electron scripts/test-load.js",
+    "test:privacy": "electron scripts/test-privacy-ui.js",
+    "test:instance": "node scripts/test-single-instance.js",
+    "lint": "eslint .",
+    "test:coverage": "node --test --experimental-test-coverage tests/*.test.js",
+    "test:reliability": "electron scripts/test-reliability-ui.js",
+    "test:network": "electron scripts/test-network.js"
   },
   "devDependencies": {
-    "electron": "45.4.1",
-    "electron-builder": "26.18.0"
+    "@electron/asar": "3.4.1",
+    "@electron/fuses": "1.8.0",
+    "electron": "45.5.0",
+    "electron-builder": "26.18.0",
+    "eslint": "10.15.0",
+    "node-gyp": "12.4.0",
+    "typescript": "5.9.3"
   },
   "build": {
     "appId": "com.nocturnenotes.desktop",
@@ -33,6 +46,7 @@
       "windows-shell.css",
       "preview-api.js",
       "recovery.js",
+      "drafts.js",
       "window-shape.js",
       "corner-resize.js",
       "main.js",
@@ -42,7 +56,13 @@
       "undo-buffer.js",
       "features.css",
       "settings.js",
-      "i18n.js"
+      "i18n.js",
+      "content-policy.js",
+      "html-content.js",
+      "ipc-contract.js",
+      "node_modules/parse5/**/*",
+      "node_modules/entities/**/*",
+      "cipher-db.js"
     ],
     "directories": {
       "output": "dist"
@@ -75,7 +95,7 @@
       }
     ],
     "nsis": {
-      "artifactName": "Nocturne Notes Setup ${version}.exe",
+      "artifactName": "Nocturne Notes Setup.exe",
       "oneClick": false,
       "perMachine": false,
       "allowElevation": false,
@@ -98,6 +118,29 @@
     "portable": {
       "artifactName": "Nocturne Notes Portable.exe",
       "requestExecutionLevel": "user"
+    },
+    "extraResources": [
+      {
+        "from": "native/build/Release/nocturne_cipher.node",
+        "to": "nocturne_cipher.node"
+      },
+      {
+        "from": "native/notices",
+        "to": "third-party-notices"
+      }
+    ],
+    "electronFuses": {
+      "runAsNode": false,
+      "enableNodeOptionsEnvironmentVariable": false,
+      "enableNodeCliInspectArguments": false,
+      "enableEmbeddedAsarIntegrityValidation": true,
+      "onlyLoadAppFromAsar": true
     }
+  },
+  "dependencies": {
+    "parse5": "7.3.0"
+  },
+  "overrides": {
+    "minimatch@>=7 <11": "11.0.9"
   }
 }

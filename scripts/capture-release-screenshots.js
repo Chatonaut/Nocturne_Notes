@@ -4,7 +4,7 @@ const {app,BrowserWindow}=require('electron');
 const fs=require('node:fs'),os=require('node:os'),path=require('node:path');
 const profile=fs.mkdtempSync(path.join(os.tmpdir(),'nocturne-release-shot-'));
 app.setPath('userData',profile);
-const {newProject}=require('../storage');
+const {newProject,ProjectStore}=require('../storage');
 const project=path.join(profile,'Writing Desk.ns');
 newProject(project,[
  {title:'A quiet space',html:'<h1>Make room for ideas.</h1><p>Nocturne Notes is a quiet place for writing, thinking and organizing the things that matter.</p><p>Keep your thoughts together in a local project. Write freely, revisit ideas and refine them at your own pace.</p><h3>Today</h3><ul><li>Capture a new idea</li><li>Review the reading list</li><li>Make time for focused writing</li></ul><p><em>Less noise. More clarity.</em></p>'},
@@ -12,6 +12,7 @@ newProject(project,[
  {title:'Reading list',html:'<p>Books and articles to revisit.</p>'},
  {title:'Projects',html:'<p>Plan the next step.</p>'}
 ]);
+const seed=new ProjectStore(project);try{seed.setPinned(seed.snapshot().notes[0].id,true);}finally{seed.close();}
 fs.writeFileSync(path.join(profile,'preferences.json'),JSON.stringify({lastProject:project,settings:{language:'en',restoreLastProject:true,sidebarWidth:240}}));
 require('../main');
 const delay=ms=>new Promise(r=>setTimeout(r,ms));
@@ -30,5 +31,12 @@ async function run(){
  await js("document.querySelector('#menu-toggle').click();document.querySelector('[data-action=settings]').click()");
  await wait(()=>js("!document.querySelector('#dialog-backdrop').hidden && !!document.querySelector('#setting-tray')"),'settings dialog');
  await delay(300);await capture('Nocturne-Notes-Settings.png');
+ await js("document.querySelector('#dialog-cancel').click()");await wait(()=>js("document.querySelector('#dialog-backdrop').hidden"),'settings closed');
+ await js("document.querySelector('#panic-lock').click()");await wait(()=>js("!!document.querySelector('#password-password')&&!document.querySelector('#dialog-backdrop').hidden"),'password setup');
+ await delay(300);await capture('Nocturne-Notes-Protection.png');
+ await js("document.querySelector('#password-password').value='Synthetic screenshot password';document.querySelector('#password-repeat').value='Synthetic screenshot password';document.querySelector('#dialog-confirm').click()");
+ await wait(async()=> (await js('window.nocturneNotes.bootstrap()')).project.encrypted && await js("document.querySelector('#dialog-backdrop').hidden&&!document.querySelector('#note-title').readOnly"),'protected project');
+ await js("document.querySelector('#panic-lock').click()");await wait(async()=> (await js('window.nocturneNotes.bootstrap()')).project.locked && await js("!document.querySelector('#locked-project-title').hidden&&document.querySelector('#editor').textContent===''"),'locked project');
+ await delay(300);await capture('Nocturne-Notes-Locked.png');
 }
 run().then(()=>app.exit(0)).catch(e=>{console.error(e);app.exit(1);});

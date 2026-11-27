@@ -1,15 +1,16 @@
 'use strict';
 // Actual Electron/Chromium layout with the production main, preload and renderer.
 // Use a disposable profile: never open or modify the user's existing notes.
-const {app,BrowserWindow}=require('electron');
+const {app,BrowserWindow,dialog}=require('electron');
 const assert=require('node:assert/strict');
+const {checkDialogButtons}=require('./check-dialog-alignment');
 const fs=require('node:fs');
 const os=require('node:os');
 const path=require('node:path');
 const profile=fs.mkdtempSync(path.join(os.tmpdir(),'nocturne-ui-'));
 app.setPath('userData',profile);
-// Regression: an explicitly chosen old-default combination must survive boot.
-fs.writeFileSync(path.join(profile,'preferences.json'),JSON.stringify({settings:{fontSize:22,titleSize:'standard',lineHeight:1.64,sidebarWidth:240}}));
+// Regression: explicitly chosen valid numeric settings must survive boot.
+fs.writeFileSync(path.join(profile,'preferences.json'),JSON.stringify({settings:{fontSize:22,titleSize:24,lineHeight:1.6,sidebarWidth:240}}));
 const main=require('../main.js');
 const delay=ms=>new Promise(r=>setTimeout(r,ms));
 const wait=async(fn,label)=>{
@@ -88,8 +89,12 @@ const run=async()=>{
   near(top.history.h,34,.1);near(top.history.cy,top.bar.cy,1);near(top.history.cy,top.system.cy,1);near(top.quick.cy,top.system.cy,1);
   near(top.system.x-top.quick.right,16,.1);
   assert.ok(top.drag.w>=24,'drag area must remain accessible');
-  assert.deepEqual(top.buttons.map(b=>b.id),['focus-mode','always-top','min-btn','max-btn','close-btn']);
+  assert.deepEqual(top.buttons.map(b=>b.id),['panic-lock','focus-mode','always-top','min-btn','max-btn','close-btn']);
   for(const b of top.buttons){near(b.cy,top.system.cy,1);assert.ok(b.hit&&b.x>=0&&b.right<=width,'top control accessible: '+b.id);}
+  for(const b of top.buttons.slice(0,3)){near(b.w,38,.1);near(b.h,38,.1);}
+  near(top.buttons[1].x-top.buttons[0].right,8,.1);near(top.buttons[2].x-top.buttons[1].right,8,.1);
+  const panic=await js(`(()=>{const p=document.querySelector('#panic-lock'),f=document.querySelector('#focus-mode'),s=p.querySelector('svg'),r=s.getBoundingClientRect();return {disabled:p.disabled,w:r.width,h:r.height,stroke:getComputedStyle(s).strokeWidth,color:getComputedStyle(p).color,peerColor:getComputedStyle(f).color};})()`);
+  assert.deepEqual(panic,{disabled:false,w:17,h:17,stroke:'1.6px',color:panic.peerColor,peerColor:panic.peerColor});
   for(const a of top.arrows)near(a.inkY,a.button.cy,2.5);
   console.log('PASS titlebar geometry',JSON.stringify(top));
   console.log('PASS native viewport and all eight grips',width,height);
@@ -221,6 +226,7 @@ const run=async()=>{
  await wait(()=>js('innerWidth===740 && innerHeight===480'),'minimum settings viewport');
  await js("document.querySelector('#menu-toggle').click();document.querySelector('[data-action=settings]').click()");
  await wait(()=>js("!!document.querySelector('#setting-line')"),'settings sliders');
+ await checkDialogButtons(js);
  const settingsLayout=await js(`(()=>{const d=document.querySelector('.glass-dialog'),r=d.getBoundingClientRect(),rows=[...document.querySelectorAll('.font-setting')];return {w:r.width,h:r.height,scroll:d.scrollHeight,client:d.clientHeight,rows:rows.map(x=>{const a=x.querySelector('.setting-copy').getBoundingClientRect(),b=x.querySelector('.font-controls').getBoundingClientRect();return {gap:b.left-a.right,aligned:Math.abs(a.y+a.height/2-b.y-b.height/2)<1};})};})()`);
  near(settingsLayout.w,600,.1);
  assert.ok(settingsLayout.h<=456,'settings remains within the minimum window: '+JSON.stringify(settingsLayout));
@@ -228,6 +234,7 @@ const run=async()=>{
  console.log('PASS minimum settings layout (scroll allowed)',JSON.stringify(settingsLayout));
  const fontListLayout=async()=>{
   await js("document.querySelector('[data-select-trigger=setting-editor-font]').click()");
+  await checkDialogButtons(js);
   const m=await js(`(()=>{const list=document.querySelector('[data-select=setting-editor-font] .glass-select-list'),d=document.querySelector('.glass-dialog'),r=list.getBoundingClientRect(),dr=d.getBoundingClientRect();return {height:list.clientHeight,scroll:list.scrollHeight,overflow:getComputedStyle(list).overflowY,count:list.children.length,inside:r.top>=dr.top&&r.bottom<=dr.bottom,visible:[...list.children].every(b=>{const r=b.getBoundingClientRect();return document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)?.closest('button')===b;})};})()`);
   assert.equal(m.count,7);assert.ok(m.scroll<=m.height+1&&m.overflow==='visible'&&m.inside&&m.visible,'all seven font choices must fit and be clickable: '+JSON.stringify(m));
   await js("document.querySelector('[data-select-trigger=setting-editor-font]').click()");
@@ -240,7 +247,13 @@ const run=async()=>{
  await fontListLayout();
  console.log('PASS relaxed settings and complete font list',JSON.stringify(roomy));
  const controls=await js("[...document.querySelectorAll('.dialog-options input[type=range]')].map(x=>[x.id,x.min,x.max,x.step])");
- assert.deepEqual(controls,[['setting-title-size','15','35','1'],['setting-font','10','35','1'],['setting-line','1','2','0.1']]);
+ assert.deepEqual(controls,[['setting-title-size','15','35','1'],['setting-font','10','35','1'],['setting-line','1','2','0.1'],['setting-autosave','1','20','1']]);
+ assert.equal(await js("document.querySelector('#setting-autosave').value"),'1');
+ assert.equal(await js("document.querySelector('#setting-autosave-value').textContent"),'1 min');
+ await js("document.querySelector('#setting-autosave').value='19';document.querySelector('[data-target=setting-autosave][data-font-step=\"1\"]').click()");
+ assert.equal(await js("document.querySelector('#setting-autosave-value').textContent"),'20 min');
+ await js("document.querySelector('[data-target=setting-autosave][data-font-step=\"1\"]').click()");
+ assert.equal(await js("document.querySelector('#setting-autosave').value"),'20');
  const fontOptions=await js("[...document.querySelectorAll('[data-select-option=setting-editor-font]')].map(b=>b.textContent)");
  assert.deepEqual(fontOptions,['Segoe UI Variable','Arial','Calibri','Verdana','Tahoma','Georgia','Times New Roman']);
  const originalInterfaceFont=await js("getComputedStyle(document.querySelector('.app-name')).fontFamily");
@@ -252,14 +265,14 @@ const run=async()=>{
  assert.equal(await js("getComputedStyle(document.querySelector('#note-title')).height"),'44px');
  near(await js("parseFloat(getComputedStyle(document.querySelector('#editor')).lineHeight)"),34,.1);
  const fontState=await js("window.nocturneNotes.bootstrap()");
- assert.equal(fontState.settings.editorFont,'georgia');
+ assert.equal(fontState.settings.editorFont,'georgia');assert.equal(fontState.settings.autosaveMs,1200000);
  assert.match(await js("getComputedStyle(document.querySelector('#editor')).fontFamily"),/^Georgia/);
  assert.match(await js("getComputedStyle(document.querySelector('#note-title')).fontFamily"),/^Georgia/);
  assert.equal(await js("getComputedStyle(document.querySelector('.app-name')).fontFamily"),originalInterfaceFont);
  const fontReload=new Promise(resolve=>wc.once('did-finish-load',resolve));wc.reload();await fontReload;
  await wait(()=>js("!!document.querySelector('.note-row') && getComputedStyle(document.querySelector('#editor')).fontFamily.startsWith('Georgia')"),'font preference survives reload');
  assert.match(await js("getComputedStyle(document.querySelector('#note-title')).fontFamily"),/^Georgia/);
- console.log('PASS seven font choices, independent UI font, persistence, three sliders and migrated settings');
+ console.log('PASS seven font choices, independent UI font, persistence, three sliders and persisted settings');
  const input=async(value)=>js("(()=>{const e=document.querySelector('#editor');e.focus();e.dispatchEvent(new InputEvent('beforeinput',{bubbles:true,cancelable:true,inputType:'insertText'}));e.innerHTML="+JSON.stringify(value)+";e.dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'insertText'}));})()");
  const body=()=>js("document.querySelector('#editor').textContent");
  await input('<p><strong>First</strong></p>');await delay(700);
@@ -281,27 +294,62 @@ const run=async()=>{
  await js("document.querySelector('#edit-redo').click()");assert.equal(await body(),'Third');
  console.log('PASS undo/redo branch and independent note history');
  const context=async id=>js("document.querySelector('[data-id="+JSON.stringify(id)+"]').dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,clientX:100,clientY:120}))");
- await context(orig);await js("document.querySelector('[data-note-action=duplicate]').click()");
+ await js("document.querySelector('#editor').dispatchEvent(new KeyboardEvent('keydown',{bubbles:true,cancelable:true,key:'F2'}))");
+ await wait(()=>js("document.activeElement.id==='note-title'&&!document.querySelector('#note-title').readOnly"),'F2 remains functional');
+ await context(orig);
+ assert.equal(await js("document.querySelector('#note-menu kbd')"),null,'F2 hint removed');
+ const menu=await js(`(()=>{const m=document.querySelector('#note-menu'),r=m.getBoundingClientRect(),root=document.querySelector('#window').getBoundingClientRect();return {width:r.width,inside:r.left>=root.left&&r.top>=root.top&&r.right<=root.right&&r.bottom<=root.bottom,labels:[...m.querySelectorAll('.context-label')].every(x=>x.scrollWidth<=x.clientWidth+1&&getComputedStyle(x).paddingLeft==='1px'&&getComputedStyle(x).paddingRight==='1px')};})()`);
+ assert.ok(menu.inside&&menu.labels&&menu.width<216,'adaptive English context menu '+JSON.stringify(menu));
+ await js("document.querySelector('[data-note-action=duplicate]').click()");
  await wait(()=>js("document.querySelectorAll('.note-row').length===3"),'duplicate');
  await draftName();
  let p=(await js("window.nocturneNotes.bootstrap()")).project;
  const copy=p.activeId;
+ // The actual inactive-note rename dialog shares the same footer.
+ await context(orig);await js("document.querySelector('[data-note-action=rename]').click()");
+ await wait(()=>js("!document.querySelector('#dialog-backdrop').hidden"),'inactive rename dialog');
+ await checkDialogButtons(js);
+ await js("document.querySelector('#dialog-cancel').click()");
+ await wait(()=>js("!document.querySelector('#note-title').readOnly&&document.querySelector('#dialog-backdrop').hidden"),'cancel inactive rename');
+ // The floating formatting toolbar opens a real link dialog, not a mock.
+ await js("document.querySelector('[data-format=link]').click()");
+ await wait(()=>js("!document.querySelector('#dialog-backdrop').hidden"),'link dialog');
+ await checkDialogButtons(js);
+ await js("document.querySelector('#dialog-cancel').click()");
+ await wait(()=>js("document.querySelector('#dialog-backdrop').hidden"),'cancel link');
  assert.notEqual(copy,orig);assert.equal(p.notes.find(n=>n.id===copy).html,'<p><em>Third</em></p>');
- await context(copy);await js("document.querySelector('[data-note-action=delete]').click();document.querySelector('#dialog-confirm').click()");
+ await context(copy);await js("document.querySelector('[data-note-action=delete]').click()");
+ await wait(()=>js("!document.querySelector('#dialog-backdrop').hidden"),'trash confirmation');
+ await checkDialogButtons(js);
+ assert.match(await js("document.querySelector('#dialog-message').textContent"),/can be restored$/);
+ await js("document.querySelector('#dialog-confirm').click()");
  await wait(()=>js("document.querySelectorAll('.note-row').length===2"),'move to trash');
  await draftName();
  assert.equal((await js("window.nocturneNotes.listTrash()"))[0].id,copy);
  await js("document.querySelector('#menu-toggle').click();document.querySelector('[data-action=trash]').click()");
  await wait(()=>js("!!document.querySelector('.trash-row')"),'trash dialog');
+ await checkDialogButtons(js);
  const trashWidth=()=>js("document.querySelector('.glass-dialog').getBoundingClientRect().width");
  near(await trashWidth(),440,.1);
  const trashLayout=await js(`(()=>{const r=document.querySelector('.trash-row'),b=[...r.querySelectorAll('button')];return {fits:b.every(e=>e.getBoundingClientRect().right<=r.getBoundingClientRect().right),title:document.querySelector('.trash-copy').getBoundingClientRect().width};})()`);
  assert.ok(trashLayout.fits&&trashLayout.title>=90,'trash controls remain readable: '+JSON.stringify(trashLayout));
+ // Exercise both permanent-deletion confirmations without deleting the note.
+ await js("document.querySelectorAll('.trash-row button')[1].click()");
+ await wait(()=>js("!document.querySelector('#dialog-backdrop').hidden&&document.querySelector('#dialog-heading').textContent==='Delete permanently?'"),'permanent delete confirmation');
+ await checkDialogButtons(js);
+ await js("document.querySelector('#dialog-cancel').click()");
+ await wait(()=>js("!!document.querySelector('.trash-row')&&!document.querySelector('#dialog-backdrop').hidden"),'return to trash');
+ await js("document.querySelector('#trash-list > button').click()");
+ await wait(()=>js("!document.querySelector('#dialog-backdrop').hidden&&!document.querySelector('#trash-list')"),'empty trash confirmation');
+ await checkDialogButtons(js);
+ await js("document.querySelector('#dialog-cancel').click()");
+ await wait(()=>js("!!document.querySelector('.trash-row')&&!document.querySelector('#dialog-backdrop').hidden"),'return to trash after purge cancellation');
  await js("document.querySelector('.trash-row button').click()");
  await wait(()=>js("document.querySelectorAll('.note-row').length===3"),'restore from trash');
  await draftName();
  await wait(()=>js("!document.querySelector('#dialog-backdrop').hidden && document.querySelector('#dialog-message').textContent==='Trash is empty'"),'empty trash after restore');
  near(await trashWidth(),400,.1);
+ await checkDialogButtons(js);
  await js("document.querySelector('#dialog-confirm').click()");
  assert.deepEqual(await js("[...document.querySelectorAll('[data-note-action=move-up] path,[data-note-action=move-down] path')].map(e=>e.getAttribute('d'))"),['m5 15 7-7 7 7','m5 9 7 7 7-7']);
  console.log('PASS compact trash, vertical menu arrows, duplicate, delete and restore');
@@ -327,8 +375,12 @@ const run=async()=>{
  const draftReload=new Promise(resolve=>wc.once('did-finish-load',resolve));wc.reload();await draftReload;
  await wait(()=>js("document.querySelector('#project-caption').textContent==='— New Project'"),'reopened draft caption');
  await draftName();
+ const oldDraft=(await js("window.nocturneNotes.bootstrap()")).project.path;
  await js("document.querySelector('#menu-toggle').click();document.querySelector('[data-action=new-project]').click()");
- await wait(()=>js("document.querySelectorAll('.note-row').length===1"),'new draft');
+ await wait(()=>js("!!document.querySelector('#dialog-discard')"),'draft warning before new project');
+ await js("document.querySelector('#dialog-discard').click()");
+ await wait(()=>js("document.querySelectorAll('.note-row').length===1 && !document.querySelector('#note-title').readOnly"),'new draft');
+ assert.equal(fs.existsSync(oldDraft),false,'discarded draft was removed');
  await draftName();
  console.log('PASS draft display name survives mutations, reload and new project');
  // Language selection is in the final Application section. Both languages must preserve
@@ -337,6 +389,14 @@ const run=async()=>{
   await js("document.querySelector('#menu-toggle').click();document.querySelector('[data-action=settings]').click()");
   await wait(()=>js("!document.querySelector('#dialog-backdrop').hidden && !!document.querySelector('#setting-language')"),'language settings');
  };
+ const checkAbout=async()=>{
+  await js("document.querySelector('#menu-toggle').click();document.querySelector('[data-action=about]').click()");
+  await wait(()=>js("document.querySelector('#dialog-backdrop').classList.contains('about-open')&&!document.querySelector('#dialog-backdrop').hidden"),'about dialog');
+  await checkDialogButtons(js);
+  await js("document.querySelector('#dialog-confirm').click()");
+  await wait(()=>js("document.querySelector('#dialog-backdrop').hidden&&!document.querySelector('#dialog-backdrop').classList.contains('about-open')"),'close about');
+ };
+ await checkAbout();
  const ownedLabels=()=>js(`(()=>{const p=s=>document.querySelector(s);return {lang:document.documentElement.lang,caption:p('#project-caption').textContent,menu:p('[data-action=new-project] span').textContent,trash:p('[data-action=trash] span').textContent,undo:p('#edit-undo').title,search:p('#search-toggle').title,placeholder:p('#editor').dataset.placeholder,rename:p('[data-note-action=rename] span').textContent,close:p('#close-btn').title};})()`);
  const enLabels={lang:'en',caption:'— New Project',menu:'New Project',trash:'Trash',undo:'Undo · Ctrl+Z',search:'Find and Replace · Ctrl+F',placeholder:'Start writing...',rename:'Rename',close:'Close'};
  const ruLabels={lang:'ru',caption:'— Новый проект',menu:'Новый проект',trash:'Корзина',undo:'Отменить · Ctrl+Z',search:'Поиск и замена · Ctrl+F',placeholder:'Начни писать...',rename:'Переименовать',close:'Закрыть'};
@@ -345,6 +405,7 @@ const run=async()=>{
  const beforeLanguage=await js("document.querySelector('#editor').innerHTML");
  const setLanguage=async(value,expectedLabels)=>{
   await openSettings();
+  await checkDialogButtons(js);
   const state=await js(`(()=>{const p=s=>document.querySelector(s);return {sections:[...document.querySelectorAll('.settings-group > .settings-caption')].map(e=>e.textContent),first:p('.settings-group .setting-row strong').textContent,last:p('.settings-group:last-child .setting-row:last-child strong').textContent,languageLabel:p('#setting-language').closest('.setting-row').querySelector('strong').textContent,trayChecked:p('#setting-tray').checked,selected:p('#setting-language').value,options:[...document.querySelectorAll('[data-select-option=setting-language]')].map(e=>e.textContent),width:p('.glass-dialog').getBoundingClientRect().width,sectionGaps:[...document.querySelectorAll('.settings-group + .settings-group')].map(e=>({margin:parseFloat(getComputedStyle(e).marginTop),padding:parseFloat(getComputedStyle(e).paddingTop),border:parseFloat(getComputedStyle(e).borderTopWidth)})),rangeWidths:[...document.querySelectorAll('.font-step')].map(e=>e.getBoundingClientRect().width),footer:p('#dialog-confirm').textContent};})()`);
   const isEn=state.selected==='en';
   assert.deepEqual(state.sections,isEn?['Editor','Saving','Application']:['Редактор','Сохранение','Приложение']);
@@ -356,7 +417,10 @@ const run=async()=>{
   assert.deepEqual(state.options,isEn?['English','Russian']:['Английский','Русский']);
   near(state.width,600,.1);assert.ok(state.rangeWidths.every(w=>Math.abs(w-35)<.1));
   assert.equal(state.footer,isEn?'Save':'Сохранить');
+  assert.equal(await js("document.querySelector('#setting-autosave-value').textContent"),isEn?'20 min':'20 мин');
+  assert.equal(await js("document.querySelector('#setting-autosave').value"),'20');
   await js("document.querySelector('[data-select-trigger=setting-language]').scrollIntoView({block:'nearest'});document.querySelector('[data-select-trigger=setting-language]').click()");
+  await checkDialogButtons(js);
   const optionHits=await js(`[...document.querySelectorAll('[data-select-option=setting-language]')].every(b=>{const r=b.getBoundingClientRect();return document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)?.closest('button')===b;})`);
   assert.ok(optionHits,'both language options are visible and clickable');
   await js("document.querySelector('[data-select-option=setting-language][data-value="+value+"]').click();document.querySelector('#setting-tray').checked=true;document.querySelector('#dialog-confirm').click()");
@@ -364,6 +428,7 @@ const run=async()=>{
   assert.deepEqual(await ownedLabels(),expectedLabels);
   assert.equal(await js("document.querySelector('#editor').innerHTML"),beforeLanguage);
   assert.equal((await js("window.nocturneNotes.bootstrap()")).settings.language,value);
+  await checkAbout();
   assert.ok(main.getTray()&&!main.getTray().isDestroyed());
   assert.deepEqual(main.getTrayMenu().items.filter(i=>i.type!=='separator').map(i=>i.label),value==='en'?['Open Nocturne Notes','Exit']:['Открыть Nocturne Notes','Выход']);
  };
@@ -374,6 +439,7 @@ const run=async()=>{
  assert.equal(await body(),'Настройки — user content');
  await js("document.querySelector('#menu-toggle').click();document.querySelector('[data-action=trash]').click()");
  await wait(()=>js("document.querySelector('#dialog-message').textContent==='Корзина пуста'"),'Russian trash');
+ await checkDialogButtons(js);
  await js("document.querySelector('#dialog-confirm').click()");
  // A reload proves persistence; unlike a language switch it resets session undo.
  // Flush through the real window-blur handler before reloading only the renderer.
@@ -385,6 +451,7 @@ const run=async()=>{
  await setLanguage('en',enLabels);
  await js("document.querySelector('#menu-toggle').click();document.querySelector('[data-action=trash]').click()");
  await wait(()=>js("document.querySelector('#dialog-message').textContent==='Trash is empty'"),'English trash');
+ await checkDialogButtons(js);
  await js("document.querySelector('#dialog-confirm').click()");
  console.log('PASS English default, Russian and English live switch, saved locale, unchanged notes and session undo');
  // Exercise the actual Tray object and its native menu handlers. Never expose
@@ -415,10 +482,16 @@ const run=async()=>{
  // Keep the test runner alive long enough to inspect disk after the real
  // native Exit callback closes the window; app.exit below ends the runner.
  app.on('before-quit',e=>e.preventDefault());
+ const savedFile=path.join(profile,'tray-exit-saved.ns');
+ dialog.showSaveDialog=async()=>({canceled:false,filePath:savedFile});
  main.getTrayMenu().items.find(i=>i.id==='tray-exit').click();
+ await wait(()=>js("!!document.querySelector('#dialog-discard')"),'native Exit prompts to save draft');
+ await checkDialogButtons(js);
+ await js("document.querySelector('#dialog-confirm').click()");
  await wait(()=>win.isDestroyed()&&main.getTray()===null,'native Exit closes and removes tray');
+ assert.equal(fs.existsSync(trayProject.path),false);
  const {ProjectStore}=require('../storage');
- const saved=new ProjectStore(trayProject.path);
+ const saved=new ProjectStore(savedFile);
  try{assert.equal(saved.snapshot().notes.find(n=>n.id===trayProject.activeId).html,'<p>Exit save test</p>');}finally{saved.close();}
  assert.equal(JSON.parse(fs.readFileSync(path.join(profile,'preferences.json'),'utf8')).settings.minimizeToTray,true);
  console.log('PASS native tray, bilingual menu, close saves and hides, restore retains undo, normal minimize, disable and Exit saves');

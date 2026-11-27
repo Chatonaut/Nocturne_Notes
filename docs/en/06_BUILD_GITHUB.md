@@ -1,21 +1,13 @@
-# Build and packaging
+# Windows build and distribution — 2.5.0
+Authoritative recipe: [.github/workflows/windows.yml](../../.github/workflows/windows.yml). Run on a disposable Windows x64 runner; never execute installer or profile-cleanup tests on a real user workstation. Node.js 22, Python Pillow 11.3.0 and pefile 2024.8.26, pinned Electron 45.5.0, electron-builder 26.18.0.
 
-Windows 11 x64 or Windows GitHub-hosted runner, Node.js 22, Python with Pillow 11.3.0 and pefile 2024.8.26. Keep electron 45.4.1 and electron-builder 26.18.0 locked.
+1. Check exact source/artwork freeze (`node scripts/verify-release-freeze.js`) and visual reference (`npm run verify:visual`); use `npm ci --no-audit --no-fund` without altering package-lock.json.
+2. Initialize Electron (`npx --no-install electron --version`), resolve actual binary and npm CLI via `require.resolve('electron/cli.js')`; verify actual exit status. Scope ELECTRON_RUN_AS_NODE only to explicit unbundled diagnostic steps; never enable packaged RunAsNode.
+3. Run lint, type checks, early current-format/storage/IPC tests, npm full/production audit, dependency inventory.
+4. Checkout SQLCipher Community commit 355d4db92d3404e71faa8088d071a71d767807f4, vcpkg commit 9290f1a2049af5fdd6d580efbb765baaa85a3623; build pinned SQLCipher/OpenSSL with `scripts/build-sqlcipher.ps1`. Native audit must pass before compilation; verify actual runtime, exact versions and package scope; emit SBOMs. Keep SHA-pinned actions. Cache only downloaded tools and vcpkg binary archives keyed by runner/toolset/port/triplet/lock, not application binaries.
+5. Run full unit coverage, actual UI, protection, reliability, browser preview, sidebar, draft, instance and offline checks. The agreed stable-release recipe omits load and comparative performance runs; retain the scripts for deliberate separate validation.
+6. Generate approved icon with `python scripts/prepare-windows-icon.py`; `npm run build:win`; verify packaged files, fuses, native SQLCipher in actual hardened EXEs, exact locale packs en-US.pak/ru.pak, file description Minimalist note editor, version 2.5.0 and all embedded icons.
+7. Run one real Portable first-frame test with named synthetic project and `scripts/test-installer.ps1`: per-user install, shortcuts, association, native runtime and actual first frame, uninstall without deleting user data. Preserve diagnostics on failure.
+8. Generate and verify SHA256SUMS.txt for actual EXEs. Keep reports and SBOMs. Publish only verified files after owner authorization. The independently rebuilt binaries may differ in bytes; never reuse checksums from another run.
 
-```powershell
-npm run verify:visual
-npm ci --no-audit --no-fund
-npm test
-npm run test:ui
-python -m pip install Pillow==11.3.0 pefile==2024.8.26
-python scripts/prepare-windows-icon.py
-npm run build:win
-node scripts/verify-package.js
-python scripts/verify-exe-icons.py assets/nocturne-notes-refined.ico 'dist/win-unpacked/Nocturne Notes.exe' 'dist/Nocturne Notes Portable.exe' 'dist/Nocturne Notes Setup 2.0.0.exe'
-./scripts/test-installer.ps1
-Get-FileHash -Algorithm SHA256 'dist/Nocturne Notes Portable.exe','dist/Nocturne Notes Setup 2.0.0.exe'
-```
-
-Installer smoke test modifies a disposable runner's shortcuts and profile: do not run it on a normal workstation with real notes. The output directory is dist. Required EXEs: Nocturne Notes Setup 2.0.0.exe and Nocturne Notes Portable.exe; checksums SHA256SUMS.txt. Runtime ASAR allowlist, two actual locale packs en-US.pak and ru.pak; NSIS English/Russian. No digital signature configured. Installer is per-user, assisted, with selectable directory, desktop/Start Menu shortcuts and .ns registration; uninstall preserves data. Standard ICO unchanged, custom NSIS macro changes Start Menu only.
-
-Public workflow builds and tests the snapshot, publishes GitHub Release assets with SHA-256. Private acceptance included the three alternating benchmark runs against 1.8.0; this historical comparison requires a separate baseline checkout and is not repeated from an absent public history. Build output can differ byte-for-byte between runs; compare SHA256SUMS for the specific downloaded release.
+Output: `dist/Nocturne Notes Setup.exe`, `dist/Nocturne Notes Portable.exe`, `dist/SHA256SUMS.txt`. Installer assisted/per-user, selectable path, shortcuts and .ns registration; no elevation, no deletion of app data. NSIS EN/RU. No signing certificate configured. SHA-256 is integrity, not publisher authentication. Native advisory CVE-2026-119586 has a conditional CLI-only reviewed disposition; do not waive other advisory failures or unavailable results. See [QA](07_QA_ACCEPTANCE.md).

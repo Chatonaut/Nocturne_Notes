@@ -1,6 +1,7 @@
 'use strict';
 // Computes a constrained diagonal resize anchored at the opposite corner.
 // Pure math: tested independently of native Windows message handling.
+/** @param {{x:number,y:number,width:number,height:number}} bounds @param {string} corner @param {number} dx @param {number} dy @param {number} [minWidth] @param {number} [minHeight] */
 function cornerResizeBounds(bounds,corner,dx,dy,minWidth=740,minHeight=480){
  if(!bounds||!['nw','ne','sw','se'].includes(corner))return null;
  if(![bounds.x,bounds.y,bounds.width,bounds.height,dx,dy].every(Number.isFinite))return null;

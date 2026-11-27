@@ -3,44 +3,275 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
+    paths:
+      - '**.js'
+      - '**.ts'
+      - '**.cjs'
+      - 'tsconfig.json'
+      - 'native/**'
+      - '.github/workflows/windows.yml'
+      - '**.css'
+      - '**.html'
+      - 'package*.json'
+      - 'assets/**'
+      - 'build/**'
+      - 'scripts/**'
 permissions:
-  contents: write
+  contents: read
+concurrency:
+  group: nocturne-windows-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   build-windows:
+    if: github.ref == 'refs/heads/main'
     runs-on: windows-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - name: Checkout approved Nocturne Notes source
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Configure build cache paths on allocated Windows runner
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $vcpkg = Join-Path $env:RUNNER_TEMP 'nocturne-vcpkg-cache'
+          $electron = Join-Path $env:RUNNER_TEMP 'nocturne-electron-cache'
+          $builder = Join-Path $env:RUNNER_TEMP 'nocturne-builder-cache'
+          New-Item -ItemType Directory -Force -Path $vcpkg,$electron,$builder | Out-Null
+          @(
+            "VCPKG_DEFAULT_BINARY_CACHE=$vcpkg"
+            'VCPKG_BINARY_SOURCES=clear;default,readwrite'
+            "electron_config_cache=$electron"
+            "ELECTRON_CACHE=$electron"
+            "ELECTRON_BUILDER_CACHE=$builder"
+          ) | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
       - name: Configure Node.js 22
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '22'
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Restore Electron download cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: electron-cache
+        with:
+          path: ${{ env.ELECTRON_CACHE }}
+          key: nocturne-electron-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}-release-baseline
+      - name: Restore Electron headers cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: headers-cache
+        with:
+          path: ~/AppData/Local/node-gyp/Cache
+          key: nocturne-headers-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}
+      - name: Restore packaging tool cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: builder-cache
+        with:
+          path: ${{ env.ELECTRON_BUILDER_CACHE }}
+          key: nocturne-builder-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}
+      - name: Verify exact approved release source freeze
+        run: node scripts/verify-release-freeze.js
       - name: Verify approved UI and packaged resources
         run: npm run verify:visual
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
-      - name: Test SQLite, recovery and Windows shell
-        run: npm test
+      - name: Resolve and verify installed Electron before native compilation
+        shell: pwsh
+        run: |
+          npx --no-install electron --version
+          if ($LASTEXITCODE -ne 0) { throw 'Electron executable initialization failed' }
+          $electron = (node -p "require('electron')").Trim()
+          if ($LASTEXITCODE -ne 0 -or !(Test-Path -LiteralPath $electron)) { throw 'Electron executable missing' }
+          if ((node -p "require('electron/package.json').version").Trim() -ne '45.5.0') { throw 'Unexpected Electron version' }
+          $cli = (node -p "require.resolve('electron/cli.js')").Trim()
+          if ($LASTEXITCODE -ne 0 -or !(Test-Path -LiteralPath $cli)) { throw 'Electron npm CLI missing' }
+          "NOCTURNE_ELECTRON_CLI=$cli" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      - name: Verify Electron launcher waits and forwards the actual exit status
+        run: node scripts/test-electron-ci-launch.js
+      - name: Verify immutable dependency lock
+        shell: pwsh
+        run: |
+          npm ls minimatch
+          if ($LASTEXITCODE -ne 0) { throw 'Invalid dependency graph' }
+          git diff --exit-code -- package-lock.json
+          if ($LASTEXITCODE -ne 0) { throw 'Dependency lock changed' }
+      - name: Record direct and deprecated dependencies
+        run: node scripts/dependency-inventory.js
+      - name: Check typed IPC and pure geometry contracts
+        run: npm run check:types
+      - name: Static JavaScript correctness checks
+        shell: pwsh
+        run: |
+          npm run lint -- --max-warnings 0 --format json --output-file lint-report.json
+          $lintExit = $LASTEXITCODE
+          if (Test-Path -LiteralPath 'lint-report.json') {
+            $report = Get-Content -LiteralPath 'lint-report.json' -Raw | ConvertFrom-Json
+            $errors = 0
+            $warnings = 0
+            foreach ($file in $report) {
+              $relativePath = [IO.Path]::GetRelativePath((Get-Location).Path, $file.filePath).Replace('\', '/')
+              $errors += $file.errorCount
+              $warnings += $file.warningCount
+              foreach ($message in $file.messages) {
+                $severity = if ($message.severity -eq 2) { 'error' } else { 'warning' }
+                Write-Host ("${relativePath}:$($message.line):$($message.column) ${severity} $($message.ruleId): $($message.message)")
+              }
+            }
+            Write-Host "ESLint: $errors errors, $warnings warnings"
+          } else {
+            throw 'ESLint did not produce its report'
+          }
+          if ($lintExit -ne 0) { throw "ESLint failed with exit code $lintExit" }
+      - name: Verify trusted IPC URL, precise Windows file identity and storage reliability before native compilation
+        run: node --test tests/password-policy.test.js tests/ipc-sender-url.test.js tests/file-identity.test.js tests/reliability.test.js tests/storage.test.js tests/drafts.test.js tests/pinning.test.js tests/window-shape.test.js tests/settings.test.js tests/i18n.test.js tests/project-format.test.js tests/preview-storage.test.js
+      - name: Audit all npm dependencies and production dependencies
+        shell: pwsh
+        run: |
+          npm audit --json | Out-File -Encoding utf8 audit-report.json
+          $allCode = $LASTEXITCODE
+          npm audit --omit=dev --json | Out-File -Encoding utf8 audit-production.json
+          $prodCode = $LASTEXITCODE
+          Get-Content audit-report.json
+          Get-Content audit-production.json
+          if ($allCode -ne 0 -or $prodCode -ne 0) { throw 'npm audit did not pass; review report before publishing' }
+      - name: Checkout official SQLCipher Community Edition 4.20.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: sqlcipher/sqlcipher
+          ref: 355d4db92d3404e71faa8088d071a71d767807f4
+          path: _sqlcipher
+          persist-credentials: false
+      - name: Audit pinned native dependency advisories before compilation
+        run: node scripts/audit-native.js
+      - name: Checkout pinned vcpkg for static OpenSSL
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: microsoft/vcpkg
+          ref: 9290f1a2049af5fdd6d580efbb765baaa85a3623
+          path: _vcpkg
+          persist-credentials: false
+      - name: Determine native cache identity
+        id: native-cache-key
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $vswhere = Join-Path ([Environment]::GetEnvironmentVariable('ProgramFiles(x86)')) 'Microsoft Visual Studio\Installer\vswhere.exe'
+          $vs = (& $vswhere -latest -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath).Trim()
+          if (!$vs) { throw 'MSVC missing' }
+          $toolset = (Get-Content -LiteralPath (Join-Path $vs 'VC/Auxiliary/Build/Microsoft.VCToolsVersion.default.txt') -Raw).Trim()
+          if (!$toolset -or !$env:ImageVersion) { throw 'Native cache toolchain identity missing' }
+          New-Item -ItemType Directory -Force -Path $env:VCPKG_DEFAULT_BINARY_CACHE | Out-Null
+          "identity=$($env:ImageVersion)-msvc-$toolset" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+      - name: Restore vcpkg binary cache
+        id: vcpkg-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
+          key: nocturne-vcpkg-v1-${{ runner.os }}-${{ runner.arch }}-9290f1a2049af5fdd6d580efbb765baaa85a3623-x64-windows-static-${{ steps.native-cache-key.outputs.identity }}
+      - name: Compile pinned SQLCipher and Node-API binding
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $vswhere = Join-Path ([Environment]::GetEnvironmentVariable('ProgramFiles(x86)')) 'Microsoft Visual Studio\Installer\vswhere.exe'
+          $vs = (& $vswhere -latest -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath).Trim()
+          if (!$vs) { throw 'MSVC missing' }
+          cmd /s /c """$vs\Common7\Tools\VsDevCmd.bat"" -arch=x64 -host_arch=x64 && set" | ForEach-Object {
+            if ($_ -match '^([^=]+)=(.*)$') { Set-Item -Path "Env:$($Matches[1])" -Value $Matches[2] }
+          }
+          & .\_vcpkg\bootstrap-vcpkg.bat -disableMetrics
+          if ($LASTEXITCODE -ne 0) { throw 'vcpkg bootstrap failed' }
+          & .\_vcpkg\vcpkg.exe install openssl:x64-windows-static --disable-metrics --clean-after-build
+          if ($LASTEXITCODE -ne 0) { throw 'OpenSSL build failed' }
+          ./scripts/build-sqlcipher.ps1
+      - name: Save vcpkg binary cache after successful native compilation
+        if: steps.vcpkg-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
+          key: ${{ steps.vcpkg-cache.outputs.cache-primary-key }}
+      - name: Save Electron headers cache after successful native compilation
+        if: steps.headers-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/AppData/Local/node-gyp/Cache
+          key: ${{ steps.headers-cache.outputs.cache-primary-key }}
+      - name: Verify native SQLCipher in Electron runtime
+        shell: pwsh
+        run: |
+          $env:ELECTRON_RUN_AS_NODE = '1'
+          node $env:NOCTURNE_ELECTRON_CLI scripts/test-cipher-native.js
+          $nativeExit = $LASTEXITCODE
+          Write-Host "Native SQLCipher process exit: $nativeExit"
+          if ($nativeExit -ne 0) { throw "Native SQLCipher verification failed (exit $nativeExit)" }
+          node $env:NOCTURNE_ELECTRON_CLI --test tests/encryption.test.js
+          $projectExit = $LASTEXITCODE
+          Write-Host "SQLCipher project tests process exit: $projectExit"
+          if ($projectExit -ne 0) { throw "SQLCipher project tests failed (exit $projectExit)" }
+      - name: Match actual native runtime against audited versions
+        run: node scripts/audit-native.js --verify-runtime
+      - name: Generate npm and packaged runtime SBOMs
+        shell: pwsh
+        run: |
+          npm sbom --sbom-format cyclonedx --sbom-type application | Out-File -Encoding utf8 sbom-all.json
+          if ($LASTEXITCODE -ne 0) { throw 'Full SBOM generation failed' }
+          npm sbom --omit=dev --sbom-format cyclonedx --sbom-type application | Out-File -Encoding utf8 sbom-production.json
+          if ($LASTEXITCODE -ne 0) { throw 'Production SBOM generation failed' }
+          node scripts/record-sbom.js
+          if ($LASTEXITCODE -ne 0) { throw 'Native SBOM generation failed' }
+      - name: Test SQLite, recovery, SQLCipher and Windows shell with coverage
+        shell: pwsh
+        run: |
+          npm run test:coverage | Tee-Object -FilePath coverage-report.txt
+          if ($LASTEXITCODE -ne 0) { throw 'Unit tests failed' }
       - name: Test actual Electron desktop layout
         run: npm run test:ui
+      - name: Test editor transition, recovery and replacement failures
+        run: npm run test:reliability
+      - name: Test password dialogs, protection, safe overwrite and tray
+        run: npm run test:privacy
+      - name: Test actual Chromium preview import and export security
+        run: node $env:NOCTURNE_ELECTRON_CLI scripts/test-review-browser.js
+      - name: Test actual sidebar preference failure rollback
+        run: node $env:NOCTURNE_ELECTRON_CLI scripts/test-review-sidebar.js
+      - name: Test rapid sidebar toggles and state across actual process restarts
+        run: node scripts/test-sidebar-session.js
+      - name: Test temporary draft lifecycle and bookmark UI
+        run: node scripts/test-draft-session.js
+      - name: Test second instance handoff
+        run: npm run test:instance
+      - name: Verify default offline network behavior
+        run: npm run test:network
+      - name: Save Electron download cache after Electron initialization
+        if: steps.electron-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ env.ELECTRON_CACHE }}
+          key: ${{ steps.electron-cache.outputs.cache-primary-key }}
       - name: Prepare Windows icon from accepted logo (no redesign)
         shell: pwsh
         run: |
           python -m pip install --disable-pip-version-check --quiet Pillow==11.3.0 pefile==2024.8.26
           python scripts/prepare-windows-icon.py
           if (!(Test-Path -LiteralPath 'assets/nocturne-notes-refined.ico')) { throw 'Refined icon not generated' }
-      - name: Build NSIS Installer and Portable EXE
+      - name: Build Windows Installer and Portable EXEs
         run: npm run build:win
-      - name: Verify both EXEs and English/Russian locales
+      - name: Save packaging tool cache after successful packaging
+        if: steps.builder-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ env.ELECTRON_BUILDER_CACHE }}
+          key: ${{ steps.builder-cache.outputs.cache-primary-key }}
+      - name: Verify both Windows EXEs and English/Russian locales
         shell: pwsh
         run: |
-          $files = @('dist/Nocturne Notes Portable.exe','dist/Nocturne Notes Setup 2.0.0.exe')
+          $files = @('dist/Nocturne Notes Portable.exe', 'dist/Nocturne Notes Setup.exe')
           foreach ($file in $files) {
             if (!(Test-Path -LiteralPath $file)) { throw "Missing: $file" }
             if ((Get-Item -LiteralPath $file).Length -lt 10000000) { throw "Unexpectedly small: $file" }
+            $info = (Get-Item -LiteralPath $file).VersionInfo
+            if ($info.FileDescription -cne 'Minimalist note editor') { throw "Unexpected file description for ${file}: $($info.FileDescription)" }
+            Write-Host "Verified file description for ${file}: $($info.FileDescription)"
           }
           $localeDir = 'dist/win-unpacked/locales'
           $actual = @(Get-ChildItem -LiteralPath $localeDir -Filter '*.pak' | Select-Object -ExpandProperty Name | Sort-Object)
@@ -55,46 +286,125 @@ jobs:
           Get-Content 'dist/SHA256SUMS.txt'
       - name: Verify packaged application file list
         run: node scripts/verify-package.js
+      - name: Verify packaged Electron fuses
+        run: node scripts/verify-fuses.js
+      - name: Verify native SQLCipher in hardened packaged executable and Portable
+        run: node scripts/test-packaged-cipher.js
+      - name: Verify actual Portable first visible frame and named project
+        run: node scripts/test-portable-launch.js
       - name: Verify actual embedded executable icons
-        run: python scripts/verify-exe-icons.py assets/nocturne-notes-refined.ico 'dist/win-unpacked/Nocturne Notes.exe' 'dist/Nocturne Notes Portable.exe' 'dist/Nocturne Notes Setup 2.0.0.exe'
-      - name: Verify installation, shortcut icons and uninstall
+        run: python scripts/verify-exe-icons.py assets/nocturne-notes-refined.ico 'dist/win-unpacked/Nocturne Notes.exe' 'dist/Nocturne Notes Portable.exe' 'dist/Nocturne Notes Setup.exe'
+      - name: Install, verify and uninstall actual Windows Setup
         shell: pwsh
         run: ./scripts/test-installer.ps1
-      - name: Publish Windows Portable
-        uses: actions/upload-artifact@v4
+      - name: Capture actual application screenshots with synthetic notes
+        run: node $env:NOCTURNE_ELECTRON_CLI scripts/capture-release-screenshots.js
+      - name: Compose social preview from approved logo and real screenshot
+        run: python scripts/make-social-preview.py
+      - name: Upload screenshots and social preview
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: Nocturne-Notes-2.0.0-Windows-Portable
+          name: Nocturne-Notes-2.5.0-screenshots
+          path: |
+            dist/Nocturne-Notes-Editor.png
+            dist/Nocturne-Notes-Settings.png
+            dist/Nocturne-Notes-Protection.png
+            dist/Nocturne-Notes-Locked.png
+            dist/Nocturne-Notes-Social-Preview.png
+          if-no-files-found: error
+          retention-days: 14
+      - name: Publish Windows Setup
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: Nocturne-Notes-2.5.0-Setup
+          path: dist/Nocturne Notes Setup.exe
+          if-no-files-found: error
+          retention-days: 14
+      - name: Publish Windows Portable
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: Nocturne-Notes-2.5.0-Portable
           path: dist/Nocturne Notes Portable.exe
           if-no-files-found: error
-          retention-days: 90
-      - name: Publish Windows Installer
-        uses: actions/upload-artifact@v4
-        with:
-          name: Nocturne-Notes-2.0.0-Windows-Installer
-          path: dist/Nocturne Notes Setup 2.0.0.exe
-          if-no-files-found: error
-          retention-days: 90
+          retention-days: 14
       - name: Publish SHA256 checksums
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: Nocturne-Notes-2.0.0-SHA256
+          name: Nocturne-Notes-2.5.0-SHA256
           path: dist/SHA256SUMS.txt
           if-no-files-found: error
-          retention-days: 90
-      - name: Capture real application screenshots
-        run: npx --no-install electron scripts/capture-release-screenshots.js
-      - name: Publish stable release (never replace an existing release)
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ github.token }}
+          retention-days: 14
+      - name: Upload audit and functional evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: Nocturne-Notes-2.5.0-test-evidence
+          path: |
+            audit-report.json
+            audit-production.json
+            lint-report.json
+            coverage-report.txt
+            packaged-native-results.json
+            native-runtime.json
+            native-audit.json
+            sbom-all.json
+            sbom-production.json
+            network-evidence.json
+            dependency-inventory.json
+            portable-launch.json
+            portable-launch-diagnostics.json
+          if-no-files-found: warn
+          retention-days: 14
+
+  publish-release:
+    needs: build-windows
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout verified public source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Publish verified 2.5.0 assets without replacing existing releases
+        shell: bash
         run: |
-          $existing = gh release list --repo $env:GITHUB_REPOSITORY --limit 100 --json tagName | ConvertFrom-Json
-          if ($LASTEXITCODE -ne 0) { throw 'Could not list existing releases' }
-          if ($existing.tagName -contains 'v2.0.0') {
-            Write-Host 'v2.0.0 already exists; preserving its binaries'
-          } else {
-            gh release create v2.0.0 --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title 'Nocturne Notes 2.0.0' --notes-file RELEASE_NOTES.md --latest 'dist/Nocturne Notes Setup 2.0.0.exe' 'dist/Nocturne Notes Portable.exe' 'dist/SHA256SUMS.txt' 'dist/Nocturne-Notes-Editor.png' 'dist/Nocturne-Notes-Settings.png'
-            if ($LASTEXITCODE -ne 0) { throw 'Release publication failed' }
-          }
-          gh release view v2.0.0 --repo $env:GITHUB_REPOSITORY --json url,assets
-          if ($LASTEXITCODE -ne 0) { throw 'Could not verify release' }
+          set -euo pipefail
+          test "$GITHUB_REPOSITORY" = Chatonaut/Nocturne_Notes
+          test "$(gh api "repos/$GITHUB_REPOSITORY" --jq .private)" = false
+          node scripts/verify-release-freeze.js
+          if gh release view v2.5.0 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo 'Existing release must be reviewed; never replace it.'
+            exit 1
+          fi
+          mkdir dist verify evidence
+          for name in Setup Portable SHA256 screenshots; do
+            gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --name "Nocturne-Notes-2.5.0-$name" --dir dist
+          done
+          gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --name Nocturne-Notes-2.5.0-test-evidence --dir evidence
+          (cd dist && sha256sum -c SHA256SUMS.txt)
+          zip -q -r dist/Stable-build-evidence.zip evidence
+          assets=('Nocturne Notes Setup.exe' 'Nocturne Notes Portable.exe' SHA256SUMS.txt Nocturne-Notes-Editor.png Nocturne-Notes-Settings.png Nocturne-Notes-Protection.png Nocturne-Notes-Locked.png Nocturne-Notes-Social-Preview.png Stable-build-evidence.zip)
+          paths=()
+          for f in "${assets[@]}"; do test -s "dist/$f"; paths+=("dist/$f"); done
+          gh release create v2.5.0 --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title 'Nocturne Notes 2.5.0' --draft --notes-file RELEASE_NOTES.md "${paths[@]}"
+          gh release download v2.5.0 --repo "$GITHUB_REPOSITORY" --dir verify
+          python - <<'PY'
+          import hashlib, pathlib
+          def digest(p):
+              h=hashlib.sha256()
+              with p.open('rb') as f:
+                  for b in iter(lambda:f.read(1024*1024),b''): h.update(b)
+              return h.hexdigest()
+          expected=sorted(digest(p) for p in pathlib.Path('dist').iterdir() if p.is_file())
+          actual=sorted(digest(p) for p in pathlib.Path('verify').iterdir() if p.is_file())
+          assert len(expected)==9 and actual==expected, 'Release bytes differ'
+          print('PASS all nine actual release assets match source files')
+          PY
+          gh release edit v2.5.0 --repo "$GITHUB_REPOSITORY" --draft=false --latest
+          echo 'PASS public release assets verified byte-for-byte before publication'

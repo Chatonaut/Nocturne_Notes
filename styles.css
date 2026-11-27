@@ -61,7 +61,7 @@ body.is-electron .desktop{padding:8px;background:transparent}body.is-electron .w
 @media (max-width:940px){:root{--sidebar-w:200px;--font-size:23px}.note-row{font-size:17px}.note-title{margin-bottom:76px}}
 @media (max-width:720px){:root{--sidebar-w:155px;--font-size:19px}.note-row{font-size:15px;min-height:40px}.note-title{margin-bottom:45px}.window-controls button{width:38px}.floating-toolbar{transform:scale(.85);transform-origin:top left}}
 
-/* v0.1.1 – narrower notes list and truly flush collapse (approved layout preserved). */
+/* Narrow notes list and truly flush collapse (approved layout preserved). */
 .sidebar.collapsed{width:0;min-width:0;border-right:0;background:transparent}
 .sidebar.collapsed .sidebar-tab{right:-25px;z-index:8}
 .sidebar.collapsed + .editor-outer{padding-left:11px}
@@ -92,7 +92,7 @@ body.motion-reduced *,body.motion-reduced *::before,body.motion-reduced *::after
 @media(max-width:940px){.note-row{font-size:14px;min-height:35px;padding:7px 11px}}
 @media(max-width:720px){.note-row{font-size:13px;min-height:33px;padding:7px 9px}.setting-row{gap:10px}.setting-row select{min-width:96px}}
 
-/* Nocturne Notes 0.1.2: the approved black design with precise controls. */
+/* Approved black design with precise controls. */
 .sidebar{flex-shrink:0}
 .sidebar-resizer{position:absolute;z-index:9;right:-5px;top:3px;bottom:3px;width:10px;cursor:col-resize;touch-action:none;outline:none}
 .sidebar-resizer::after{content:"";position:absolute;left:4px;top:0;bottom:0;width:1px;background:transparent;transition:background .15s}
@@ -149,7 +149,7 @@ body.sidebar-resizing .sidebar{transition:none!important}
 /* Alternative note-title size, without altering the approved standard appearance. */
 .window.small-note-title .note-title{font-size:clamp(20px,1.65vw,24px)}
 
-/* Nocturne Notes 0.1.5 — motion-only refinements. No visual or spacing changes. */
+/* Motion-only refinements. No visual or spacing changes. */
 /* Animate only one flex dimension instead of competing width and min-width transitions. */
 .sidebar{
   flex: 0 0 var(--sidebar-w);
@@ -196,7 +196,7 @@ body.sidebar-resizing .sidebar{transition:none!important}
 }
 
 
-/* Nocturne Notes 0.1.6 — visual refinements requested after the locked 0.1.5 design. */
+/* Approved visual refinements to the locked design. */
 /* Equal 10px inset all four sides of the editing surface, including collapsed sidebar. */
 .editor-outer,
 .sidebar.collapsed + .editor-outer{padding:10px}
@@ -248,7 +248,7 @@ body.sidebar-resizing .sidebar{transition:none!important}
 }
 
 
-/* Nocturne Notes 1.0 RC: precision and responsive motion; locked visual system. */
+/* Precision and responsive motion; locked visual system. */
 /* The flex geometry is unchanged; containment limits repaint/reflow propagation
    while resizing and keeps the sidebar tab free to protrude outside its panel. */
 .sidebar { contain: layout style; transition: flex-basis 96ms cubic-bezier(.33,.12,.67,.9); }
@@ -305,7 +305,7 @@ body.sidebar-resizing .sidebar{transition:none!important}
 }
 
 
-/* Nocturne Notes 1.0: double the motion speed without changing the appearance.
+/* Responsive motion without changing the appearance.
    Sidebar width transition 96 -> 48 ms, associated fades 58 -> 29 ms. */
 .sidebar { transition: flex-basis 48ms cubic-bezier(.33,.12,.67,.9); }
 .sidebar .note-list, .sidebar .sidebar-footer {
@@ -335,7 +335,7 @@ body.sidebar-resizing .sidebar{transition:none!important}
 }
 
 
-/* Nocturne Notes 1.1 — targeted updates, approved appearance otherwise unchanged. */
+/* Targeted motion updates, approved appearance otherwise unchanged. */
 /* Motion is now 30 ms for sidebar, toolbar, menus, and all hover affordances. */
 .sidebar { transition:flex-basis 30ms cubic-bezier(.33,.12,.67,.9); }
 .sidebar .note-list,.sidebar .sidebar-footer {
@@ -378,7 +378,7 @@ body.sidebar-resizing .sidebar{transition:none!important}
 }
 
 
-/* Nocturne Notes 1.1.1 — only the two requested spacing adjustments. */
+/* Approved spacing adjustments. */
 /* The title and body share .editor-scroll, so their left insets stay identical.
    Horizontal right inset, vertical insets, font sizes and editor shell are unchanged. */
 .editor-scroll { padding-left:clamp(12.5px,2.1vw,29.5px); }
@@ -389,7 +389,7 @@ body.sidebar-resizing .sidebar{transition:none!important}
 .dialog-backdrop.settings-open .glass-dialog { width:min(448px,calc(100% - 26px)); }
 
 
-/* Nocturne Notes 1.2 — requested editor insets and heading spacing. */
+/* Approved editor insets and heading spacing. */
 /* One scroll area contains the title and body. These values intentionally take
    precedence over the older narrow-viewport padding rules. */
 .editor-scroll { padding-top:40px; padding-left:35px; padding-right:35px; }
@@ -400,7 +400,7 @@ body.sidebar-resizing .sidebar{transition:none!important}
 .editor p { margin-bottom:var(--paragraph-gap,.72em); }
 
 
-/* Nocturne Notes 1.2.5 — only the requested vertical editor spacing.
+/* Approved vertical editor spacing.
    Title begins 35px below the scroll content edge. At the end of a long
    document the editable text has exactly 35px of bottom scroll padding. */
 .editor-scroll { padding-top:35px; padding-bottom:35px; }
@@ -409,7 +409,7 @@ body.sidebar-resizing .sidebar{transition:none!important}
 .editor > :last-child { margin-bottom:0; }
 
 
-/* Nocturne Notes 1.2.5 — optical 35px hotfix.
+/* Optical 35px inset.
    A 35px CSS inset was measured to the input's *line box*, but the visible
    title glyphs start 8px lower. The following inset makes the painted first
    letter appear 35px from the upper border in the default (standard) size.
@@ -419,7 +419,7 @@ body.sidebar-resizing .sidebar{transition:none!important}
 .window.small-note-title .editor-scroll { padding-top:29px; }
 
 
-/* Nocturne Notes 1.2.5 — optically aligned editor geometry.
+/* Optically aligned editor geometry.
    The first note row is vertically centered at 34px below the editor-scroll
    origin on desktop. Center the title line box with it, rather than setting
    padding to 35px without considering the title font and line box.
@@ -455,7 +455,7 @@ body.sidebar-resizing .sidebar{transition:none!important}
 .sidebar-footer .add-note {padding:0;place-items:center;}
 
 
-/* Nocturne Notes 1.2.5: optical bottom gutter correction.
+/* Optical bottom gutter correction.
    The top inset optically aligns the note heading with the first sidebar row;
    it is not a measure of the ink at the end of the body text.
    A real 30px scrollable bottom inset leaves approximately 35px between the
@@ -465,7 +465,7 @@ body.sidebar-resizing .sidebar{transition:none!important}
 .editor-scroll, .window.small-note-title .editor-scroll { padding-bottom:var(--editor-bottom-padding,30px); scroll-padding-bottom:var(--editor-bottom-padding,30px); }
 
 
-/* Nocturne Notes 1.2.8 — one-line note names without ellipsis or wrapping.
+/* One-line note names without ellipsis or wrapping.
    Long text is silently clipped at the button edge. Keep previous one-line height. */
 .note-list .note-row {
   flex: 0 0 auto;
@@ -486,7 +486,7 @@ body.sidebar-resizing .sidebar{transition:none!important}
 }
 
 
-/* Nocturne Notes 1.2.9 — small, isolated settings refinements. */
+/* Isolated settings refinements. */
 .glass-select-list button + button { margin-top:2px; }
 .dialog-backdrop.settings-open .dialog-buttons button {
   height:36px;
@@ -500,7 +500,7 @@ body.sidebar-resizing .sidebar{transition:none!important}
 }
 
 
-/* Nocturne Notes 1.2.10: one consistent control height in settings and dialogs.
+/* Consistent control height in settings and dialogs.
    Other controls (titlebar, sidebar, floating formatting) retain their
    approved geometries. */
 .dialog-buttons button,
@@ -517,7 +517,7 @@ body.sidebar-resizing .sidebar{transition:none!important}
 .font-step { height:35px; width:35px; padding:0; }
 .glass-select-trigger { height:35px; min-height:35px; box-sizing:border-box; padding-top:0; padding-bottom:0; }
 
-/* Nocturne Notes 1.2.11: project name in the existing title bar. */
+/* Project name in the existing title bar. */
 .app-title{display:flex;align-items:baseline;gap:6px;min-width:0;flex:0 1 auto;position:relative;z-index:1;white-space:nowrap}
 .app-title .app-name{flex-shrink:0}
 .project-caption{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:15px;font-weight:400;letter-spacing:-.02em;color:#b4b4b8}
@@ -602,7 +602,7 @@ body.sidebar-resizing .sidebar{transition:none!important}
 .about-product{font-size:16px;line-height:1.2;font-weight:590;white-space:nowrap;color:#ededee;}
 .about-version{font-size:12px;line-height:1.3;color:#aaaab0;white-space:nowrap;}
 
-/* 1.4.2: non-invasive search navigation and third matching footer button. */
+/* Search navigation and third matching footer button. */
 .sidebar-footer .save-note{width:36px;height:36px;min-width:36px;min-height:36px;display:grid;place-items:center;padding:0;}
 .sidebar-footer .save-note svg{width:17px;height:17px;stroke-width:1.7;}
 .search-navigation{display:flex;align-items:center;justify-content:space-between;min-height:22px;gap:7px;padding:0 1px;}

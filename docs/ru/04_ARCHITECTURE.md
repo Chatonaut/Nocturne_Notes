@@ -1,22 +1,23 @@
-# Архитектура
+# Архитектура — 2.5.0
+Electron 45.5.0, обычные HTML/CSS/JavaScript, главный процесс Node, изолированные renderer/preload с sandbox, закрепленный npm lockfile. Нет серверной части и аккаунтов. Node 22 — CLI сборки/тестов; Electron содержит собственный Node.
 
-Electron 45.4.1: главный процесс и изолированный renderer, обычные HTML/CSS/JS, SQLite через node:sqlite. Без дополнительного UI-фреймворка и внешней runtime-зависимости БД. npm ci использует фиксированный lockfile; Node 22 — CLI сборки и тестов.
-
-| Модуль | Ответственность |
+| Модуль | Назначение |
 |---|---|
-| main.js | Жизненный цикл окна, нативный resize, меню/трей, IPC проектов и настроек, диалоги |
-| preload.js | Явный contextBridge API, захват указателя resize |
-| renderer.js | Редактор, DOM, состояние, история, сохранение/recovery, настройки, локализация |
-| index.html / styles.css | Замороженный интерфейс и стили |
-| brand.css / windows-shell.css / features.css | Согласованная графика, Windows-оболочка и дополнения |
-| storage.js | ProjectStore, транзакции SQLite, валидация формата, корзина |
-| recovery.js | Атомарные recovery-снимки по пути |
-| search.js / undo-buffer.js | Поиск по тексту и сессионная история |
-| settings.js / i18n.js | Проверенные настройки и словарь EN/RU |
-| window-shape.js / corner-resize.js | Расчет нативной формы и границ |
-| preview-api.js | Браузерная демонстрация localStorage/JSON; не desktop-хранилище .ns |
-| build/installer.nsh / scripts/ | NSIS-настройка, проверки, бенчмарки и тесты |
+| main.js | Жизненный цикл окна, форма, меню/трей, переходы проектов, диалоги, защита и проверяемый IPC |
+| preload.js | Узкий contextBridge API; захват указателя нативного resize |
+| renderer.js | Редактор, DOM, undo, поиск, последовательные сохранение/recovery, настройки, язык, маска приватности |
+| index.html, styles.css, brand.css, windows-shell.css, features.css | Утвержденный интерфейс и оболочка |
+| storage.js | ProjectStore, транзакции обычных/защищенных БД, логические копии, корзина, закрепления, метаданные |
+| cipher-db.js, native/cipher.cc | Node-API и SQLCipher; статический OpenSSL, CRT /MT |
+| recovery.js, drafts.js | Точный ID файла, атомарное восстановление, управляемые временные проекты |
+| content-policy.js, html-content.js | Политика HTML DOM/parse5, экспорт TXT/Markdown/HTML |
+| ipc-contract.js, types/contracts.d.ts | Проверка параметров, типизированные контракты, точный доверенный локальный URL |
+| search.js, undo-buffer.js | Компактные смещения, поиск по области, ограниченная история сессии |
+| settings.js, i18n.js | Проверенные настройки и строки EN/RU |
+| window-shape.js, corner-resize.js | Форма/границы, coalesced resize |
+| preview-api.js | Браузерный localStorage/JSON-просмотр, не desktop .ns |
+| scripts/, tests/, build/installer.nsh | Сборка, аудит, регрессии, упаковка, иконка ярлыка NSIS |
 
-Renderer использует contextIsolation, без Node integration, webSecurity включен; preload предоставляет ограниченный IPC. sandbox выключен для существующего preload, не расширять границы доступа. Проверять данные в main/storage; избегать произвольного IPC и внешней навигации. Только ссылки HTTP(S) передаются ОС. Нет сервера и аккаунтов.
+Renderer: contextIsolation, sandbox, webSecurity, без Node. CSP; IPC проверяет точный WebContents/главный фрейм и ожидаемый локальный URL (нормализуются только эквивалентные незарезервированные символы), проверка параметров main/storage. Только проверенные HTTP(S)/mailto передаются ОС. Браузерный просмотр также очищает импорт/изменения/экспорт. В упакованном Electron включены целостность ASAR и загрузка только ASAR, отключены RunAsNode, переменные Node и inspect CLI. Нативная диагностика использует только синтетические данные.
 
-Настройки: app.getPath('userData')/preferences.json; отдельные каталоги drafts и recovery. Установленная редакция сохраняет существующий профиль Electron и app ID; Portable использует %APPDATA%/Nocturne Notes Portable и отдельный ID панели задач, определяется PORTABLE_EXECUTABLE_FILE. Portable не полностью самодостаточен по данным. Запуск скрыт до готовности renderer и стилей. Трей существует только при включении; подтверждение сохранения определяет скрытие/выход. Before-quit запрашивает полный выход. Не менять запуск и идентификаторы без явной регрессионной проверки.
+Настройки — `userData/preferences.json`, подкаталоги drafts и recovery. Setup: `%APPDATA%/Nocturne Notes`; Portable: `%APPDATA%/Nocturne Notes Portable`, определяется PORTABLE_EXECUTABLE_FILE в упаковке. Отдельные ID и профили. Нативное окно скрыто до готовности проекта, стилей и кадров renderer; трей скрывает только после успешной записи. Реальный выход подтверждается; сбой не скрывает и не отбрасывает данные молча. При блокировке защищенного проекта интерфейс скрывается до записи, затем БД закрывается, редактор и история очищаются. См. [формат NS](05_NS_FORMAT.md) и [сборку](06_BUILD_GITHUB.md).

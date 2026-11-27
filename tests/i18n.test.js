@@ -20,3 +20,13 @@ test('localization catalog covers native tooltips, static labels, and known stor
 });
 
 test('tray menu and settings are bilingual',()=>{assert.equal(text('en','Приложение'),'Application');assert.equal(text('en','Сворачивать в трей при закрытии'),'Minimize to tray on close');assert.equal(text('en','Открыть Nocturne Notes'),'Open Nocturne Notes');assert.equal(text('en','Выход'),'Exit');assert.equal(text('ru','Выход'),'Выход');});
+
+test('direct application-owned Russian strings are bilingual and use е instead of ё',()=>{
+ for(const file of ['renderer.js','main.js','storage.js','drafts.js','html-content.js','recovery.js','preview-api.js']){
+  const js=fs.readFileSync(path.join(__dirname,'..',file),'utf8');
+  for(const m of js.matchAll(/(?:\bt\(|\btoast\(|new Error\(|\btitle:|\bconfirm:)\s*(['"])([^'"\n]*[А-Яа-яЁё][^'"\n]*)\1/g)){
+   assert.ok(Object.hasOwn(EN,m[2]),file+' missing translation: '+m[2]);assert.ok(!/[Ёё]/.test(m[2]),file+' inconsistent Russian spelling: '+m[2]);
+  }
+ }
+ for(const key of Object.keys(EN))assert.ok(!/[Ёё]/.test(key),'Inconsistent Russian spelling: '+key);
+});

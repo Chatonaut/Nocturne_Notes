@@ -1,6 +1,9 @@
 # Test an actual per-user install on the disposable Windows CI runner.
 $ErrorActionPreference = 'Stop'
-$setup = (Resolve-Path 'dist/Nocturne Notes Setup 2.0.0.exe').Path
+if ($env:GITHUB_ACTIONS -ne 'true' -or !$env:RUNNER_TEMP) { throw 'Installer smoke test requires a disposable Windows CI runner' }
+$manifest = Get-Content -LiteralPath 'package.json' -Raw | ConvertFrom-Json
+$artifactName = $manifest.build.nsis.artifactName.Replace('${version}', [string]$manifest.version)
+$setup = (Resolve-Path -LiteralPath (Join-Path 'dist' $artifactName)).Path
 $folder = Join-Path $env:RUNNER_TEMP 'NocturneNotesReleaseSmoke'
 $exe = Join-Path $folder 'Nocturne Notes.exe'
 $uninstall = Join-Path $folder 'Uninstall Nocturne Notes.exe'
@@ -13,6 +16,12 @@ function Run-Checked($file, $arguments) {
 }
 function IconPath($shortcut) {
   return (($shortcut.IconLocation -split ',')[0]).Trim('"')
+}
+if (!$env:APPDATA) { throw 'Missing APPDATA' }
+$profile = Join-Path $env:APPDATA 'Nocturne Notes'
+$project = Join-Path $env:RUNNER_TEMP 'Nocturne Notes Release Smoke.ns'
+foreach ($existing in @($folder,$profile,$start,$desktop,$project)) {
+  if (Test-Path -LiteralPath $existing) { throw "Refusing to overwrite existing resource: $existing" }
 }
 try {
   Run-Checked $setup "/S /D=$folder"
@@ -33,11 +42,19 @@ try {
   $command = (Get-ItemProperty -LiteralPath "Registry::HKEY_CURRENT_USER\Software\Classes\$association\shell\open\command" -ErrorAction Stop).'(default)'
   if ($command -notlike "*$exe*") { throw "Incorrect .ns open command: $command" }
   Write-Host 'PASS .ns association'
-  # Smoke-test the shipped app, not only the source renderer.
-  $profile = Join-Path $env:APPDATA 'Nocturne Notes'
+  # Verify the installed application is the exact audited payload.
+  foreach ($relative in @('Nocturne Notes.exe','resources\app.asar','resources\nocturne_cipher.node')) {
+    if ((Get-FileHash -LiteralPath (Join-Path $folder $relative)).Hash -ne (Get-FileHash -LiteralPath (Join-Path 'dist/win-unpacked' $relative)).Hash) { throw "Installed payload differs: $relative" }
+  }
+  Run-Checked $exe '--nocturne-verify-native'
+  Write-Host 'PASS installed payload and native encryption'
+  # Open a disposable named project using the actual installed executable.
+  node -e "const {newProject}=require('./storage');newProject(process.argv[1],[{title:'Synthetic installed project',html:'<p>Installer smoke test</p>'}]);" $project
+  if ($LASTEXITCODE -ne 0 -or !(Test-Path -LiteralPath $project)) { throw 'Synthetic project creation failed' }
   $timing = Join-Path $profile 'startup-timing.json'
+  $env:NOCTURNE_CI_STARTUP_TRACE = '1'
   $before = Get-Date
-  $app = Start-Process -FilePath $exe -PassThru
+  $app = Start-Process -FilePath $exe -ArgumentList ('"' + $project + '"') -PassThru
   try {
     $ready = $false
     for ($i=0; $i -lt 60; $i++) {
@@ -46,19 +63,26 @@ try {
       Start-Sleep -Seconds 1
     }
     if (!$ready) { throw 'Installed app did not report first frame' }
+    $preferences = Join-Path $profile 'preferences.json'
+    $prefs = Get-Content -LiteralPath $preferences -Raw | ConvertFrom-Json
+    if ($prefs.lastProject -ne $project) { throw 'Installed application did not open the named project' }
     $app.Refresh()
-    if ($app.MainWindowHandle -ne 0) { [void]$app.CloseMainWindow(); [void]$app.WaitForExit(15000) }
-    Write-Host 'PASS installed application first frame'
+    if ($app.MainWindowHandle -eq 0 -or !$app.CloseMainWindow() -or !$app.WaitForExit(15000)) { throw 'Installed application did not close normally' }
+    Write-Host 'PASS installed application first frame and named project'
   } finally {
+    Remove-Item Env:NOCTURNE_CI_STARTUP_TRACE -ErrorAction SilentlyContinue
     if (!$app.HasExited) { Stop-Process -Id $app.Id -Force }
   }
+  $projectHash = (Get-FileHash -LiteralPath $project).Hash
+  $prefsHash = (Get-FileHash -LiteralPath $preferences).Hash
   Run-Checked $uninstall '/S'
   for ($i=0; $i -lt 20 -and (Test-Path $exe); $i++) { Start-Sleep -Seconds 1 }
   foreach ($file in @($exe,$start,$desktop,$icon)) {
     if (Test-Path -LiteralPath $file) { throw "Uninstall left installed resource: $file" }
   }
   if (!(Test-Path (Join-Path $profile 'preferences.json'))) { throw 'Uninstall removed user preferences' }
-  Write-Host 'PASS uninstall preserves user data'
+  if ((Get-FileHash -LiteralPath $preferences).Hash -ne $prefsHash -or (Get-FileHash -LiteralPath $project).Hash -ne $projectHash) { throw 'Uninstall changed user preferences or named project' }
+  Write-Host 'PASS uninstall preserves user data byte for byte'
 } finally {
   if (Test-Path -LiteralPath $uninstall) { Start-Process -FilePath $uninstall -ArgumentList '/S' -Wait }
 }

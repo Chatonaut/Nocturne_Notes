@@ -1,5 +1,2 @@
-# Work plan and maintenance
-
-2.0.0 application scope is complete and manually accepted. Preserve the accepted snapshot. Distribution work consists of bilingual documentation, clean public source, GitHub Release with verified Windows Installer and Portable and SHA-256, and authentic screenshots. The private development repository retains source history and original accepted artifacts; public repository begins with a clean release snapshot. Do not carry private discussion or experimental history into public source.
-
-For maintenance: open a scoped issue, create a separate branch, protect data/format and visual lock, test both editions, obtain owner acceptance, then update version, EN/RU docs and release. Do not add features without approval. Remove only superseded artifacts after ensuring stable assets remain recoverable; never rewrite Git history.
+# Maintenance
+Preserve the accepted UI, project format, pinned runtime and artwork. Scope changes, test on synthetic data, update EN/RU docs and follow [build](06_BUILD_GITHUB.md) and [QA](07_QA_ACCEPTANCE.md). Never weaken gates or overwrite existing release assets. Extended load/compare runs are deliberate separate validation, not repeated for identical frozen distribution. Verify actual [Releases](https://github.com/Chatonaut/Nocturne_Notes/releases).
