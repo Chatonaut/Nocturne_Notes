@@ -2,6 +2,7 @@
 
 <h1 align="center">Nocturne Notes</h1>
 <p align="center"><strong>Minimalist note editor</strong></p>
+<p align="center">A quiet space for your thoughts.</p>
 <p align="center">Windows 11 x64 · Open source</p>
 
 <p align="center">
